@@ -54,6 +54,8 @@ namespace Docs
             InitializeComponent();
             CultureInfo.DefaultThreadCurrentCulture = CultureInfo.InvariantCulture;
             CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.InvariantCulture;
+            System.Threading.Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
+            System.Threading.Thread.CurrentThread.CurrentUICulture = CultureInfo.InvariantCulture;
         }
         #region Parameter
         public List<DocType> ADocs = new List<DocType>();
@@ -65,7 +67,7 @@ namespace Docs
                 return;
             try
             {
-                SLDocument sl = new SLDocument(fname, "20200731更新");
+                SLDocument sl = new SLDocument(fname, "工作表1");
                 SLWorksheetStatistics stats = sl.GetWorksheetStatistics();
                 if (stats.EndRowIndex <= 0)
                     return;
@@ -87,6 +89,14 @@ namespace Docs
                         Rtime = sl.GetCellValueAsDateTime(i + 2, 9),
                         Own = sl.GetCellValueAsString(i + 2, 11).Trim()
                     };
+                    if (DateTime.TryParseExact(sl.GetCellValueAsString(i + 2, 8), "yyyy-MM-dd", null, System.Globalization.DateTimeStyles.None, out DateTime _date))
+                    {
+                        docs.Stime = _date;
+                    }
+                    if (DateTime.TryParseExact(sl.GetCellValueAsString(i + 2, 9), "yyyy-MM-dd", null, System.Globalization.DateTimeStyles.None, out _date))
+                    {
+                        docs.Rtime = _date;
+                    }
                     if (sl.GetCellStyle(i + 2, 2).Font.FontColor == System.Drawing.Color.FromArgb(255, 255, 0, 0))
                         docs.Eng = true;
                     if (docs.webID.Contains("documentId"))
@@ -96,17 +106,26 @@ namespace Docs
                         {
                             docs.webID = m.Groups[1].ToString();
                         }
-                        else
-                            docs.webID = "-1";
                     }
-                    else if (Int32.TryParse(sl.GetCellValueAsString(i + 2, 3).Trim(), out int id))
+                    else if (Int64.TryParse(sl.GetCellValueAsString(i + 2, 3).Trim(), out long id2))
                     {
-                        docs.webID = id.ToString();
+                        docs.webID = id2.ToString();
                     }
                     else
                         docs.webID = "-1";
-
-                   ADocs.Add(docs);
+                    if (Int64.TryParse(sl.GetCellValueAsString(i + 2, 1).Trim(), out long id))
+                    {
+                        docs.Index = id.ToString();
+                    }
+                    else
+                        docs.Index = "-1";
+                    if (Double.TryParse(sl.GetCellValueAsString(i + 2, 5).Trim(), out double id3))
+                    {
+                        docs.Version = id3.ToString();
+                    }
+                    else
+                        docs.Version = "-1";
+                    ADocs.Add(docs);
                 }
                 sl.CloseWithoutSaving();
             }
@@ -166,14 +185,27 @@ namespace Docs
                 var odocs = ADocs.GroupBy(o => o.Own).ToDictionary(o => o.Key, o => o.ToList());
                 try
                 {
+                    string fpath = Environment.CurrentDirectory + @"\管理員";
+                    if (!System.IO.Directory.Exists(fpath))
+                    {
+                        System.IO.Directory.CreateDirectory(fpath);
+                    }
+                    foreach (var finame in System.IO.Directory.GetFileSystemEntries(fpath))
+                    {
+                        if (System.IO.Path.GetExtension(finame) != ".xlsx")
+                            continue;
+                        string nfpath = Environment.CurrentDirectory + @"\管理員\備份";
+                        if (!System.IO.Directory.Exists(nfpath))
+                        {
+                            System.IO.Directory.CreateDirectory(nfpath);
+                        }
+                        string fname = System.IO.Path.GetFileNameWithoutExtension(finame);
+                        File.Copy(fpath + @"\" + fname + ".xlsx", nfpath + @"\" + fname + "(" + DateTime.Now.ToString("yyy-MM-dd-HH-mm-ss") + ")" + ".xlsx", true);
+                        File.Delete(fpath + @"\" + fname + ".xlsx");
+                    }
                     foreach (var x in odocs)
                     {
                         SLDocument sl = ExportExcel(x.Value);
-                        string fpath = Environment.CurrentDirectory + @"\管理員";
-                        if (!System.IO.Directory.Exists(fpath))
-                        {
-                            System.IO.Directory.CreateDirectory(fpath);
-                        }
                         sl.SaveAs(fpath + @"\" + x.Key + ".xlsx");
                         this.TxtBox1.Text += Environment.NewLine
                             + x.Key + string.Format(" 負責: {0, 5} 份", x.Value.Count.ToString());
@@ -189,9 +221,19 @@ namespace Docs
         {
             int i = 1;
             SLDocument sl = new SLDocument();
+            sl.RenameWorksheet(SLDocument.DefaultFirstSheetName, "工作表1");
+
             SLConditionalFormatting cf = new SLConditionalFormatting("C2", "C1000");
             cf.HighlightCellsWithDuplicates(SLHighlightCellsStyleValues.LightRedFill);
-            cf.HighlightCellsEndingWith("0", SLHighlightCellsStyleValues.LightRedFill);
+            cf.HighlightCellsEqual(true, "-1", SLHighlightCellsStyleValues.LightRedFill);
+            sl.AddConditionalFormatting(cf);
+            cf = new SLConditionalFormatting("B2", "B1000");
+            cf.HighlightCellsWithDuplicates(SLHighlightCellsStyleValues.LightRedFill);
+            cf.HighlightCellsEqual(true, "0", SLHighlightCellsStyleValues.LightRedFill);
+            sl.AddConditionalFormatting(cf);
+            cf = new SLConditionalFormatting("A2", "A1000");
+            cf.HighlightCellsWithDuplicates(SLHighlightCellsStyleValues.LightRedFill);
+            cf.HighlightCellsEqual(true, "0", SLHighlightCellsStyleValues.LightRedFill);
             sl.AddConditionalFormatting(cf);
 
             SLStyle style = sl.CreateStyle();
@@ -232,7 +274,7 @@ namespace Docs
             sl.SetCellValue(1, 6, "制訂單位");
             sl.SetCellValue(1, 7, "文件類別");
             sl.SetCellValue(1, 8, "首次公佈時間");
-            sl.SetCellValue(1, 9, "上次檢視時間");
+            sl.SetCellValue(1, 9, "最近檢視時間");
             sl.SetCellValue(1, 10, "預計檢視時間");
             sl.SetCellValue(1, 11, "負責同仁");
             sl.SetCellValue(1, 12, "備註");
@@ -240,24 +282,47 @@ namespace Docs
             style.Font.FontColor = System.Drawing.Color.Red;
             foreach (var y in dts)
             {
-                sl.SetCellValue(i + 1, 1, y.Index);
+                sl.SetCellValue(i + 1, 1, Convert.ToInt64(y.Index));
                 sl.SetCellValue(i + 1, 2, y.ID);
                 if (y.Eng)
                     sl.SetCellStyle(i + 1, 2, style);
-                sl.SetCellValue(i + 1, 3, y.webID);
+                sl.SetCellValue(i + 1, 3, Convert.ToInt64(y.webID));
                 sl.SetCellValue(i + 1, 4, y.Name);
-                sl.SetCellValue(i + 1, 5, y.Version);
+                sl.SetCellValue(i + 1, 5, Convert.ToDouble(y.Version));
                 sl.SetCellValue(i + 1, 6, y.Depart);
                 sl.SetCellValue(i + 1, 7, y.doctp);
-                sl.SetCellValue(i + 1, 8, y.Stime.ToString("yyyy-MM-dd"));
-                sl.SetCellValue(i + 1, 9, y.Rtime.ToString("yyyy-MM-dd"));
-                sl.SetCellValue(i + 1, 10, y.Ntime.ToString("yyyy-MM-dd"));
-                if (y.Ntime.AddMonths(1) < DateTime.Now)
+                sl.SetCellValue(i + 1, 8, y.Stime.ToString("yyy-MM-dd"));
+                sl.SetCellValue(i + 1, 9, y.Rtime.ToString("yyy-MM-dd"));
+                sl.SetCellValue(i + 1, 10, y.Ntime.ToString("yyy-MM-dd"));
+                if (y.Ntime.AddMonths(-1) < DateTime.Now)
                     sl.SetCellStyle(i + 1, 10, style);
                 sl.SetCellValue(i + 1, 11, y.Own);
                 //sl.SetCellValue(i + 1, 13, y.Color);
+                
+                SLStyle st2 = sl.CreateStyle();
+                st2.FormatCode = "#,##0.0";
+                sl.SetCellStyle(i + 1, 5, st2);
+                SLStyle stp = sl.CreateStyle();
+                stp.Protection.Locked = false;
+                stp.Fill.SetPattern(PatternValues.Solid, System.Drawing.Color.FromArgb(255, 204, 255, 255), System.Drawing.Color.DarkSalmon);
+                stp.SetRightBorder(BorderStyleValues.Thin, System.Drawing.Color.DarkSalmon);
+                stp.SetLeftBorder(BorderStyleValues.Thin, System.Drawing.Color.DarkSalmon);
+                stp.SetTopBorder(BorderStyleValues.Thin, System.Drawing.Color.DarkSalmon);
+                stp.SetBottomBorder(BorderStyleValues.Thin, System.Drawing.Color.DarkSalmon);
+                sl.SetCellStyle(i + 1, 5, stp);
+                sl.SetCellStyle(i + 1, 9, stp);
+
                 i++;
             }
+            SLSheetProtection sp = new SLSheetProtection();
+            sp.AllowInsertRows = false;
+            sp.AllowInsertColumns = false;
+            sp.AllowFormatCells = true;
+            sp.AllowDeleteColumns = false;
+            sp.AllowDeleteRows = false;
+            sp.AllowSelectUnlockedCells = true;
+            sp.AllowSelectLockedCells = false;
+            sl.ProtectWorksheet(sp);
             return sl;
         }
         public void CombineData()
@@ -272,6 +337,7 @@ namespace Docs
                         continue;
                     LoadData(finame);
                 }
+                ADocs.Sort((x, y) => { return Convert.ToInt32(x.Index).CompareTo(Convert.ToInt32(y.Index)); });
             }
             catch (Exception e)
             {
@@ -298,9 +364,9 @@ namespace Docs
                         "        <td>{6}</td>" + Environment.NewLine +
                         "        <td>{7}</td>" + Environment.NewLine +
                         "   </tr>" + Environment.NewLine
-                        , Int32.TryParse(x.webID, out int id) && id > 0 ? "<a href =\"http://km.sltung.com.tw/km/readdocument.aspx?documentId=" + x.webID + "\">" + x.ID + "</a>" : x.ID
-                        , x.Name, x.Version, x.Depart, x.doctp, x.Stime.ToString("yyyy-MM-dd"), x.Rtime.ToString("yyyy-MM-dd"), x.Ntime.ToString("yyyy-MM-dd")
-                        , x.Ntime.AddMonths(1) < DateTime.Now ? " bgcolor=\"#FFCCFF\"": "");
+                        , Int64.TryParse(x.webID, out long id) && id > 0 ? "<a href =\"http://km.sltung.com.tw/km/readdocument.aspx?documentId=" + x.webID + "\">" + x.ID + "</a>" : x.ID
+                        , x.Name, string.Format("{0:0.0}", Convert.ToDouble(x.Version)), x.Depart, x.doctp, x.Stime.ToString("yyy-MM-dd"), x.Rtime.ToString("yyy-MM-dd"), x.Ntime.ToString("yyyy-MM-dd")
+                        , x.Ntime < DateTime.Now ? " bgcolor=\"#FFCCFF\"" : x.Ntime.AddMonths(-1) < DateTime.Now ? " bgcolor=\"#CCFFFF\"": "");
                     sw += content;
                 }
                 string foot = string.Format("" +
@@ -318,9 +384,16 @@ namespace Docs
                 {
                     System.IO.Directory.CreateDirectory(fpath);
                 }
-                File.WriteAllText(fpath + @"\new_page_66-1.htm", sw, Encoding.Default);
                 if (File.Exists(fpath + @"\new_page_66-1.htm"))
-                    File.Copy(fpath + @"\new_page_66-1.htm", fpath + @"\new_page_66-1" + "(" + DateTime.Now.ToString("yyy-MM-dd") + ")" + ".htm", true);
+                {
+                    string nfpath = Environment.CurrentDirectory + @"\合併檔\備份";
+                    if (!System.IO.Directory.Exists(nfpath))
+                    {
+                        System.IO.Directory.CreateDirectory(nfpath);
+                    }
+                    File.Copy(fpath + @"\new_page_66-1.htm", nfpath + @"\new_page_66-1" + "(" + DateTime.Now.ToString("yyy-MM-dd-HH-mm-ss") + ")" + ".htm", true);
+                }
+                File.WriteAllText(fpath + @"\new_page_66-1.htm", sw, Encoding.Default);
                 this.TxtBox1.Text += Environment.NewLine + "~~ 網頁匯出成功 ~~ " + DateTime.Now.ToLongTimeString() + Environment.NewLine;
             }
             else
@@ -346,16 +419,23 @@ namespace Docs
             }
             try
             {
-                ADocs.Sort((x, y) => { return Convert.ToInt32(x.Index).CompareTo(Convert.ToInt32(y.Index)); });
-                SLDocument sl = ExportExcel(ADocs);
+                //ADocs.Sort((x, y) => { return Convert.ToInt32(x.Index).CompareTo(Convert.ToInt32(y.Index)); });
                 string fpath = Environment.CurrentDirectory + @"\合併檔";
                 if (!System.IO.Directory.Exists(fpath))
                 {
                     System.IO.Directory.CreateDirectory(fpath);
                 }
-                sl.SaveAs(fpath + @"\" + "合併總表" + ".xlsx");
                 if (File.Exists(fpath + @"\" + "合併總表" + ".xlsx"))
-                    File.Copy(fpath + @"\" + "合併總表" + ".xlsx", fpath + @"\" + "合併總表" + "(" + DateTime.Now.ToString("yyy-MM-dd") + ")" + ".xlsx", true);
+                {
+                    string nfpath = Environment.CurrentDirectory + @"\合併檔\備份";
+                    if (!System.IO.Directory.Exists(nfpath))
+                    {
+                        System.IO.Directory.CreateDirectory(nfpath);
+                    }
+                    File.Copy(fpath + @"\" + "合併總表" + ".xlsx", nfpath + @"\" + "合併總表" + "(" + DateTime.Now.ToString("yyy-MM-dd-HH-mm-ss") + ")" + ".xlsx", true);
+                }
+                SLDocument sl = ExportExcel(ADocs);
+                sl.SaveAs(fpath + @"\" + "合併總表" + ".xlsx");
                 this.TxtBox1.Text += Environment.NewLine + "~~ 合併成功 ~~ "  + DateTime.Now.ToLongTimeString() + Environment.NewLine;
             }
             catch (Exception ex)
@@ -375,27 +455,131 @@ namespace Docs
                     this.TxtBox1.Text += Environment.NewLine + "~~ 無法讀取資料 ~~" + DateTime.Now.ToLongTimeString() + Environment.NewLine;
                     return;
                 }
-                
+            }
+
+            try
+            {
+                var exdocs = ADocs.Where(o => o.Ntime.AddMonths(-1) < DateTime.Now).ToList();
+                if (exdocs.Count > 0)
+                {
+                    SLDocument sl = ExportExcel(exdocs);
+                    string fpath = Environment.CurrentDirectory + @"\即將過期";
+                    if (!System.IO.Directory.Exists(fpath))
+                    {
+                        System.IO.Directory.CreateDirectory(fpath);
+                    }
+                    sl.SaveAs(fpath + @"\" + "即將過期" + "(" + DateTime.Now.ToString("yyy-MM-dd") + ")" + ".xlsx");
+                }
+                this.TxtBox1.Text += Environment.NewLine + string.Format("即將過期份數: {0, 5}份 ", exdocs.Count.ToString()) + DateTime.Now.ToLongTimeString() + Environment.NewLine;
+                this.TxtBox1.Text += Environment.NewLine + "~~ 匯出成功 ~~ " + DateTime.Now.ToLongTimeString() + Environment.NewLine;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message);
+            }
+        }
+
+        private void Button4_Click(object sender, RoutedEventArgs e)
+        {
+            if (ADocs.Count <= 0)
+            {
+                CombineData();
+                if (ADocs.Count <= 0)
+                {
+                    this.TxtBox1.Text += Environment.NewLine + "~~ 無法讀取資料 ~~" + DateTime.Now.ToLongTimeString() + Environment.NewLine;
+                    return;
+                }
+            }
+
+            try
+            {
+                string fpath = Environment.CurrentDirectory + @"\部門";
+                if (!System.IO.Directory.Exists(fpath))
+                {
+                    System.IO.Directory.CreateDirectory(fpath);
+                }
+                var odocs = ADocs.GroupBy(o => o.Own).ToDictionary(o => o.Key, o => o.ToList());
+                foreach (var x in odocs)
+                {
+                    fpath = Environment.CurrentDirectory + @"\部門\" + x.Key;
+                    if (!System.IO.Directory.Exists(fpath))
+                    {
+                        System.IO.Directory.CreateDirectory(fpath);
+                    }
+                }
+                this.TxtBox1.Text += Environment.NewLine + "~~ 匯出成功 ~~ " + DateTime.Now.ToLongTimeString() + Environment.NewLine;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message);
+            }
+        }
+
+        private void Button5_Click(object sender, RoutedEventArgs e)
+        {
+            if (ADocs.Count <= 0)
+            {
+                CombineData();
+                if (ADocs.Count <= 0)
+                {
+                    this.TxtBox1.Text += Environment.NewLine + "~~ 無法讀取資料 ~~" + DateTime.Now.ToLongTimeString() + Environment.NewLine;
+                    return;
+                }
+            }
+
+            try
+            {
+                string fpath = Environment.CurrentDirectory + @"\部門";
+                if (!System.IO.Directory.Exists(fpath))
+                {
+                    this.TxtBox1.Text += Environment.NewLine + "~~ 無法讀取部門資料 ~~" + DateTime.Now.ToLongTimeString() + Environment.NewLine;
+                    return;
+                }
+                List<string> dName = new List<string>();
+                foreach (var fp in System.IO.Directory.GetDirectories(fpath))
+                {
+                    dName.Add(fp);
+                    this.TxtBox1.Text += Environment.NewLine + fp + DateTime.Now.ToLongTimeString() + Environment.NewLine;
+                }
+                /*
+                foreach (var finame in System.IO.Directory.GetFileSystemEntries(fpath))
+                {
+                    if (System.IO.Path.GetExtension(finame) != ".xlsx")
+                        continue;
+                    LoadData(finame);
+                }
+
                 try
                 {
-                    var exdocs = ADocs.Where(o => o.Ntime.AddMonths(1) < DateTime.Now).ToList();
-                    if (exdocs.Count > 0)
+                    foreach (var x in odocs)
                     {
-                        SLDocument sl = ExportExcel(exdocs);
-                        string fpath = Environment.CurrentDirectory + @"\即將過期";
+                        SLDocument sl = ExportExcel(x.Value);
+                        string fpath = Environment.CurrentDirectory + @"\管理員";
                         if (!System.IO.Directory.Exists(fpath))
                         {
                             System.IO.Directory.CreateDirectory(fpath);
                         }
-                        sl.SaveAs(fpath + @"\" + "即將過期" + "(" + DateTime.Now.ToString("yyy-MM-dd") + ")" + ".xlsx");
+                        sl.SaveAs(fpath + @"\" + x.Key + ".xlsx");
+                        this.TxtBox1.Text += Environment.NewLine
+                            + x.Key + string.Format(" 負責: {0, 5} 份", x.Value.Count.ToString());
                     }
-                    this.TxtBox1.Text += Environment.NewLine + string.Format("即將過期份數: {0, 5}份 ", exdocs.Count.ToString()) + DateTime.Now.ToLongTimeString() + Environment.NewLine;
-                    this.TxtBox1.Text += Environment.NewLine + "~~ 匯出成功 ~~ " + DateTime.Now.ToLongTimeString() + Environment.NewLine;
-                }
-                catch (Exception ex)
+                }                if (exdocs.Count > 0)
                 {
-                    MessageBox.Show(ex.Message);
+                    SLDocument sl = ExportExcel(exdocs);
+                    string fpath = Environment.CurrentDirectory + @"\即將過期";
+                    if (!System.IO.Directory.Exists(fpath))
+                    {
+                        System.IO.Directory.CreateDirectory(fpath);
+                    }
+                    sl.SaveAs(fpath + @"\" + "即將過期" + "(" + DateTime.Now.ToString("yyy-MM-dd") + ")" + ".xlsx");
                 }
+                this.TxtBox1.Text += Environment.NewLine + string.Format("即將過期份數: {0, 5}份 ", exdocs.Count.ToString()) + DateTime.Now.ToLongTimeString() + Environment.NewLine;
+                */
+                this.TxtBox1.Text += Environment.NewLine + "~~ 匯出成功 ~~ " + DateTime.Now.ToLongTimeString() + Environment.NewLine;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message);
             }
         }
     }
