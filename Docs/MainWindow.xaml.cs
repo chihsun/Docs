@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.Data.Odbc;
 using System.Globalization;
 using System.IO;
@@ -61,16 +62,17 @@ namespace Docs
         public List<DocType> ADocs = new List<DocType>();
         #endregion
         #region Method
-        public void LoadData(string fname)
+        public List<DocType> ImportEXCEL(string fname)
         {
             if (!System.IO.File.Exists(fname))
-                return;
+                return new List<DocType>(); ;
             try
             {
                 SLDocument sl = new SLDocument(fname, "工作表1");
                 SLWorksheetStatistics stats = sl.GetWorksheetStatistics();
                 if (stats.EndRowIndex <= 0)
-                    return;
+                    return new List<DocType>();
+                List<DocType> ndocs = new List<DocType>();
                 for (int i = 0; i < stats.EndRowIndex; i++)
                 {
                     if (string.IsNullOrEmpty(sl.GetCellValueAsString(i + 2, 1)))
@@ -125,13 +127,15 @@ namespace Docs
                     }
                     else
                         docs.Version = "-1";
-                    ADocs.Add(docs);
+                    ndocs.Add(docs);
                 }
                 sl.CloseWithoutSaving();
+                return ndocs;
             }
             catch (Exception ex)
             {
                 MessageBox.Show(ex.Message);
+                return new List<DocType>();
             }
                 /*
                 odocs = ADocs.GroupBy(o => o.Depart).ToDictionary(o => o.Key, o => o.ToList());
@@ -165,8 +169,9 @@ namespace Docs
                 }
                 */
         }
-        public void LoadFile()
+        public void LoadFullDocs()
         {
+            ADocs.Clear();
             string fpath = Environment.CurrentDirectory;
             if (!System.IO.Directory.Exists(fpath))
             {
@@ -175,14 +180,15 @@ namespace Docs
             string fname = fpath + @"\合併檔\合併總表.xlsx";
             if (!System.IO.File.Exists(fname))
                 return;
-            LoadData(fname);
-            ExportOwn();
+            ADocs = ImportEXCEL(fname);
+            this.TxtBox1.Text += Environment.NewLine + "~~ 載入總表 ~~" + DateTime.Now.ToLongTimeString() + Environment.NewLine;
         }
         public void ExportOwn()
         {
             if (ADocs.Count > 0)
             {
                 var odocs = ADocs.GroupBy(o => o.Own).ToDictionary(o => o.Key, o => o.ToList());
+                odocs = odocs.OrderBy(o => o.Key).ToDictionary(o => o.Key, o => o.Value);
                 try
                 {
                     string fpath = Environment.CurrentDirectory + @"\管理員";
@@ -205,11 +211,12 @@ namespace Docs
                     }
                     foreach (var x in odocs)
                     {
-                        SLDocument sl = ExportExcel(x.Value);
+                        SLDocument sl = MakeEXCEL(x.Value);
                         sl.SaveAs(fpath + @"\" + x.Key + ".xlsx");
                         this.TxtBox1.Text += Environment.NewLine
                             + x.Key + string.Format(" 負責: {0, 5} 份", x.Value.Count.ToString());
                     }
+                    this.TxtBox1.Text += Environment.NewLine + "~~ 分派檔案結束 ~~" + DateTime.Now.ToLongTimeString() + Environment.NewLine;
                 }
                 catch (Exception ex)
                 {
@@ -217,21 +224,21 @@ namespace Docs
                 }
             }
         }
-        public SLDocument ExportExcel(List<DocType> dts)
+        public SLDocument MakeEXCEL(List<DocType> dts)
         {
             int i = 1;
             SLDocument sl = new SLDocument();
             sl.RenameWorksheet(SLDocument.DefaultFirstSheetName, "工作表1");
 
-            SLConditionalFormatting cf = new SLConditionalFormatting("C2", "C1000");
+            SLConditionalFormatting cf = new SLConditionalFormatting("C2", "C" + (dts.Count + 1).ToString());
             cf.HighlightCellsWithDuplicates(SLHighlightCellsStyleValues.LightRedFill);
             cf.HighlightCellsEqual(true, "-1", SLHighlightCellsStyleValues.LightRedFill);
             sl.AddConditionalFormatting(cf);
-            cf = new SLConditionalFormatting("B2", "B1000");
+            cf = new SLConditionalFormatting("B2", "B" + (dts.Count + 1).ToString());
             cf.HighlightCellsWithDuplicates(SLHighlightCellsStyleValues.LightRedFill);
             cf.HighlightCellsEqual(true, "0", SLHighlightCellsStyleValues.LightRedFill);
             sl.AddConditionalFormatting(cf);
-            cf = new SLConditionalFormatting("A2", "A1000");
+            cf = new SLConditionalFormatting("A2", "A" + (dts.Count + 1).ToString());
             cf.HighlightCellsWithDuplicates(SLHighlightCellsStyleValues.LightRedFill);
             cf.HighlightCellsEqual(true, "0", SLHighlightCellsStyleValues.LightRedFill);
             sl.AddConditionalFormatting(cf);
@@ -335,9 +342,25 @@ namespace Docs
                 {
                     if (System.IO.Path.GetExtension(finame) != ".xlsx")
                         continue;
-                    LoadData(finame);
+                    ADocs.AddRange(ImportEXCEL(finame));
                 }
-                ADocs.Sort((x, y) => { return Convert.ToInt32(x.Index).CompareTo(Convert.ToInt32(y.Index)); });
+                if (ADocs.Count > 0)
+                {
+                    ADocs.Sort((x, y) => {
+                        /*
+                        Match m = Regex.Match(x.ID, @"(\d+)-");
+                        Match n = Regex.Match(y.ID, @"(\d+)-");
+                        if (m.Success && n.Success)
+                        {
+                            return Convert.ToInt32(m.Groups[1].ToString()).CompareTo(Convert.ToInt32(n.Groups[1].ToString()));
+                        }
+                        else
+                        */
+                        return x.ID.CompareTo(y.ID); 
+                    });
+                    for (int i = 0; i < ADocs.Count; i++)
+                        ADocs[i].Index = (i + 1).ToString();
+                }
             }
             catch (Exception e)
             {
@@ -399,19 +422,8 @@ namespace Docs
             else
                 this.TxtBox1.Text += Environment.NewLine + "~~ 找不到網頁範本(template.htm) ~~ " + DateTime.Now.ToLongTimeString() + Environment.NewLine;
         }
-        #endregion
-
-        private void Button_Click(object sender, RoutedEventArgs e)
+        public void ExportAllExcel()
         {
-            ADocs.Clear();
-            LoadFile();
-            this.TxtBox1.Text += Environment.NewLine + "~~ 讀取結束 ~~" + DateTime.Now.ToLongTimeString() + Environment.NewLine;
-        }
-
-        private void Button2_Click(object sender, RoutedEventArgs e)
-        {
-            ADocs.Clear();
-            CombineData();
             if (ADocs.Count <= 0)
             {
                 this.TxtBox1.Text += Environment.NewLine + "~~ 合併失敗 ~~" + DateTime.Now.ToLongTimeString() + Environment.NewLine;
@@ -419,7 +431,6 @@ namespace Docs
             }
             try
             {
-                //ADocs.Sort((x, y) => { return Convert.ToInt32(x.Index).CompareTo(Convert.ToInt32(y.Index)); });
                 string fpath = Environment.CurrentDirectory + @"\合併檔";
                 if (!System.IO.Directory.Exists(fpath))
                 {
@@ -434,27 +445,41 @@ namespace Docs
                     }
                     File.Copy(fpath + @"\" + "合併總表" + ".xlsx", nfpath + @"\" + "合併總表" + "(" + DateTime.Now.ToString("yyy-MM-dd-HH-mm-ss") + ")" + ".xlsx", true);
                 }
-                SLDocument sl = ExportExcel(ADocs);
+                SLDocument sl = MakeEXCEL(ADocs);
                 sl.SaveAs(fpath + @"\" + "合併總表" + ".xlsx");
-                this.TxtBox1.Text += Environment.NewLine + "~~ 合併成功 ~~ "  + DateTime.Now.ToLongTimeString() + Environment.NewLine;
+                this.TxtBox1.Text += Environment.NewLine + "~~ 合併成功 ~~ " + DateTime.Now.ToLongTimeString() + Environment.NewLine;
             }
             catch (Exception ex)
             {
                 MessageBox.Show(ex.Message);
             }
-            ExportHTML();
+        }
+        #endregion
+
+        private void Button_Click(object sender, RoutedEventArgs e)
+        {
+            LoadFullDocs();
+            if (MessageBox.Show("是否確定產生分派檔案?", "分派文件資料", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.Yes) == MessageBoxResult.Yes)
+                ExportOwn();
+        }
+
+        private void Button2_Click(object sender, RoutedEventArgs e)
+        {
+            CombineData();
+            if (MessageBox.Show("是否確定合併?", "合併各負責人文件資料", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.Yes) == MessageBoxResult.Yes)
+            {
+                ExportAllExcel();
+                ExportHTML();
+            }
         }
 
         private void Button3_Click(object sender, RoutedEventArgs e)
         {
+            LoadFullDocs();
             if (ADocs.Count <= 0)
             {
-                CombineData();
-                if (ADocs.Count <= 0)
-                {
-                    this.TxtBox1.Text += Environment.NewLine + "~~ 無法讀取資料 ~~" + DateTime.Now.ToLongTimeString() + Environment.NewLine;
-                    return;
-                }
+                this.TxtBox1.Text += Environment.NewLine + "~~ 無法讀取資料 ~~" + DateTime.Now.ToLongTimeString() + Environment.NewLine;
+                return;
             }
 
             try
@@ -462,7 +487,7 @@ namespace Docs
                 var exdocs = ADocs.Where(o => o.Ntime.AddMonths(-1) < DateTime.Now).ToList();
                 if (exdocs.Count > 0)
                 {
-                    SLDocument sl = ExportExcel(exdocs);
+                    SLDocument sl = MakeEXCEL(exdocs);
                     string fpath = Environment.CurrentDirectory + @"\即將過期";
                     if (!System.IO.Directory.Exists(fpath))
                     {
@@ -481,14 +506,11 @@ namespace Docs
 
         private void Button4_Click(object sender, RoutedEventArgs e)
         {
+            LoadFullDocs();
             if (ADocs.Count <= 0)
             {
-                CombineData();
-                if (ADocs.Count <= 0)
-                {
-                    this.TxtBox1.Text += Environment.NewLine + "~~ 無法讀取資料 ~~" + DateTime.Now.ToLongTimeString() + Environment.NewLine;
-                    return;
-                }
+                this.TxtBox1.Text += Environment.NewLine + "~~ 無法讀取資料 ~~" + DateTime.Now.ToLongTimeString() + Environment.NewLine;
+                return;
             }
 
             try
@@ -506,8 +528,27 @@ namespace Docs
                     {
                         System.IO.Directory.CreateDirectory(fpath);
                     }
+                    foreach (var finame in System.IO.Directory.GetFileSystemEntries(fpath))
+                    {
+                        if (System.IO.Path.GetExtension(finame) != ".xlsx")
+                            continue;
+                        string nfpath = fpath + @"\備份";
+                        if (!System.IO.Directory.Exists(nfpath))
+                        {
+                            System.IO.Directory.CreateDirectory(nfpath);
+                        }
+                        string fname = System.IO.Path.GetFileNameWithoutExtension(finame);
+                        File.Copy(fpath + @"\" + fname + ".xlsx", nfpath + @"\" + fname + ".xlsx", true);
+                        File.Delete(fpath + @"\" + fname + ".xlsx");
+                    }
+                    var ddocs = x.Value.GroupBy(o => o.Depart).ToDictionary(o => o.Key, o => o.ToList());
+                    foreach (var y in ddocs)
+                    {
+                        SLDocument sl = MakeEXCEL(y.Value);
+                        sl.SaveAs(fpath + @"\" + y.Key + "(原-" + x.Key + ")" + ".xlsx");
+                    }
                 }
-                this.TxtBox1.Text += Environment.NewLine + "~~ 匯出成功 ~~ " + DateTime.Now.ToLongTimeString() + Environment.NewLine;
+                this.TxtBox1.Text += Environment.NewLine + "~~ 匯出部門成功 ~~ " + DateTime.Now.ToLongTimeString() + Environment.NewLine;
             }
             catch (Exception ex)
             {
@@ -517,14 +558,11 @@ namespace Docs
 
         private void Button5_Click(object sender, RoutedEventArgs e)
         {
+            LoadFullDocs();
             if (ADocs.Count <= 0)
             {
-                CombineData();
-                if (ADocs.Count <= 0)
-                {
-                    this.TxtBox1.Text += Environment.NewLine + "~~ 無法讀取資料 ~~" + DateTime.Now.ToLongTimeString() + Environment.NewLine;
-                    return;
-                }
+                this.TxtBox1.Text += Environment.NewLine + "~~ 無法讀取資料 ~~" + DateTime.Now.ToLongTimeString() + Environment.NewLine;
+                return;
             }
 
             try
@@ -535,52 +573,89 @@ namespace Docs
                     this.TxtBox1.Text += Environment.NewLine + "~~ 無法讀取部門資料 ~~" + DateTime.Now.ToLongTimeString() + Environment.NewLine;
                     return;
                 }
-                List<string> dName = new List<string>();
+                List<DocType> cdocs = new List<DocType>();
                 foreach (var fp in System.IO.Directory.GetDirectories(fpath))
                 {
-                    dName.Add(fp);
-                    this.TxtBox1.Text += Environment.NewLine + fp + DateTime.Now.ToLongTimeString() + Environment.NewLine;
-                }
-                /*
-                foreach (var finame in System.IO.Directory.GetFileSystemEntries(fpath))
-                {
-                    if (System.IO.Path.GetExtension(finame) != ".xlsx")
-                        continue;
-                    LoadData(finame);
-                }
-
-                try
-                {
-                    foreach (var x in odocs)
+                    var npath = fpath + @"\" + Path.GetFileName(fp);
+                    int count = 0;
+                    foreach (var finame in System.IO.Directory.GetFileSystemEntries(npath))
                     {
-                        SLDocument sl = ExportExcel(x.Value);
-                        string fpath = Environment.CurrentDirectory + @"\管理員";
-                        if (!System.IO.Directory.Exists(fpath))
+                        if (System.IO.Path.GetExtension(finame) != ".xlsx")
+                            continue;
+                        var ndocs = ImportEXCEL(finame);
+                        ndocs.ForEach(o => o.Own = Path.GetFileName(fp));
+                        cdocs.AddRange(ndocs);
+                        count += ndocs.Count;
+                    }
+                    this.TxtBox1.Text += Environment.NewLine
+                            + Path.GetFileName(fp) + string.Format(" 負責: {0, 5} 份", count.ToString());
+                }
+                if (cdocs.Count == ADocs.Count && cdocs.Count > 0)
+                {
+                    ADocs.Clear();
+                    ADocs = cdocs;
+                    ADocs.Sort((x, y) =>
+                    {
+                        /*
+                        Match m = Regex.Match(x.ID, @"(\d+)-");
+                        Match n = Regex.Match(y.ID, @"(\d+)-");
+                        if (m.Success && n.Success)
                         {
-                            System.IO.Directory.CreateDirectory(fpath);
+                            return Convert.ToInt32(m.Groups[1].ToString()).CompareTo(Convert.ToInt32(n.Groups[1].ToString()));
                         }
-                        sl.SaveAs(fpath + @"\" + x.Key + ".xlsx");
-                        this.TxtBox1.Text += Environment.NewLine
-                            + x.Key + string.Format(" 負責: {0, 5} 份", x.Value.Count.ToString());
-                    }
-                }                if (exdocs.Count > 0)
-                {
-                    SLDocument sl = ExportExcel(exdocs);
-                    string fpath = Environment.CurrentDirectory + @"\即將過期";
-                    if (!System.IO.Directory.Exists(fpath))
+                        else
+                        */
+                        return x.ID.CompareTo(y.ID);
+                    });
+                    for (int i = 0; i < ADocs.Count; i++)
+                        ADocs[i].Index = (i + 1).ToString();
+                    if (MessageBox.Show("是否確定合併?", "合併重分配文件資料", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.Yes) == MessageBoxResult.Yes)
                     {
-                        System.IO.Directory.CreateDirectory(fpath);
+                        ExportAllExcel();
+                        this.TxtBox1.Text += Environment.NewLine + "~~ 文件重新分派成功 ~~ " + DateTime.Now.ToLongTimeString() + Environment.NewLine;
                     }
-                    sl.SaveAs(fpath + @"\" + "即將過期" + "(" + DateTime.Now.ToString("yyy-MM-dd") + ")" + ".xlsx");
+                    else
+                        this.TxtBox1.Text += Environment.NewLine;
                 }
-                this.TxtBox1.Text += Environment.NewLine + string.Format("即將過期份數: {0, 5}份 ", exdocs.Count.ToString()) + DateTime.Now.ToLongTimeString() + Environment.NewLine;
-                */
-                this.TxtBox1.Text += Environment.NewLine + "~~ 匯出成功 ~~ " + DateTime.Now.ToLongTimeString() + Environment.NewLine;
+                else
+                    this.TxtBox1.Text += Environment.NewLine + "~~ 文件總數不符，請重新分派 ~~ " + DateTime.Now.ToLongTimeString() + Environment.NewLine;
             }
             catch (Exception ex)
             {
                 MessageBox.Show(ex.Message);
             }
+        }
+
+        private void Button6_Click(object sender, RoutedEventArgs e)
+        {
+            LoadFullDocs();
+            if (ADocs.Count <= 0)
+            {
+                this.TxtBox1.Text += Environment.NewLine + "~~ 無法讀取資料 ~~" + DateTime.Now.ToLongTimeString() + Environment.NewLine;
+                return;
+            }
+            var odocs = ADocs.GroupBy(o => o.Own).ToDictionary(o => o.Key, o => o.ToList());
+            odocs = odocs.OrderBy(o => o.Key).ToDictionary(o => o.Key, o => o.Value);
+            try
+            {
+                foreach (var x in odocs)
+                {
+                    this.TxtBox1.Text += Environment.NewLine
+                        + x.Key + string.Format(" 負責: {0, 5} 份", x.Value.Count.ToString());
+                }
+                this.TxtBox1.Text += Environment.NewLine
+                        + "      " + string.Format(" 總共: {0, 5} 份", ADocs.Count.ToString()) + Environment.NewLine;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message);
+            }
+        }
+
+        private void TxtBox1_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
+        {
+            TxtBox1.CaretIndex = TxtBox1.Text.Length;
+            TxtBox1.ScrollToEnd();
         }
     }
 }
