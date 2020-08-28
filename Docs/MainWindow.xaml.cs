@@ -216,6 +216,8 @@ namespace Docs
                         this.TxtBox1.Text += Environment.NewLine
                             + x.Key + string.Format(" 負責: {0, 5} 份", x.Value.Count.ToString());
                     }
+                    this.TxtBox1.Text += Environment.NewLine
+                        + "      " + string.Format(" 總共: {0, 5} 份", ADocs.Count.ToString()) + Environment.NewLine;
                     this.TxtBox1.Text += Environment.NewLine + "~~ 分派檔案結束 ~~" + DateTime.Now.ToLongTimeString() + Environment.NewLine;
                 }
                 catch (Exception ex)
@@ -458,18 +460,64 @@ namespace Docs
 
         private void Button_Click(object sender, RoutedEventArgs e)
         {
+            CombineData();
+            if (ADocs.Count <= 0)
+            {
+                this.TxtBox1.Text += Environment.NewLine + "~~ 無法讀取資料 ~~" + DateTime.Now.ToLongTimeString() + Environment.NewLine;
+                return;
+            }
+            int a = ADocs.Count;
             LoadFullDocs();
+            if (ADocs.Count <= 0)
+            {
+                this.TxtBox1.Text += Environment.NewLine + "~~ 無法讀取總表 ~~" + DateTime.Now.ToLongTimeString() + Environment.NewLine;
+                return;
+            }
+            int b = ADocs.Count;
             if (MessageBox.Show("是否確定產生分派檔案?", "分派文件資料", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.Yes) == MessageBoxResult.Yes)
-                ExportOwn();
+            {
+                if ((a == b && a > 0) || (a != b && MessageBox.Show("文件總數不符(請確定是否有刪減)，是否確定合併?", "文件總數不符", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) == MessageBoxResult.Yes))
+                {
+                    ExportOwn();
+                }
+                else
+                {
+                    this.TxtBox1.Text += Environment.NewLine + "~~ 文件總數不符，請再次確認文件是否有刪減 ~~ ";
+                    this.TxtBox1.Text += Environment.NewLine + "~~ 管理員: " + a + " 件 ~~ ";
+                    this.TxtBox1.Text += Environment.NewLine + "~~ 總表: " + b + " 件 ~~ " + DateTime.Now.ToLongTimeString() + Environment.NewLine;
+                }
+            }
         }
 
         private void Button2_Click(object sender, RoutedEventArgs e)
         {
+            LoadFullDocs();
+            if (ADocs.Count <= 0)
+            {
+                this.TxtBox1.Text += Environment.NewLine + "~~ 無法讀取總表 ~~" + DateTime.Now.ToLongTimeString() + Environment.NewLine;
+                return;
+            }
+            int b = ADocs.Count;
             CombineData();
+            if (ADocs.Count <= 0)
+            {
+                this.TxtBox1.Text += Environment.NewLine + "~~ 無法讀取資料 ~~" + DateTime.Now.ToLongTimeString() + Environment.NewLine;
+                return;
+            }
+            int a = ADocs.Count;
             if (MessageBox.Show("是否確定合併?", "合併各負責人文件資料", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.Yes) == MessageBoxResult.Yes)
             {
-                ExportAllExcel();
-                ExportHTML();
+                if ((a == b && a > 0) || (a != b && MessageBox.Show(string.Format("文件總數不符(請確定是否有刪減)，是否確定合併?\n管理員: {0} 件\n總表: {1} 件", a, b), "文件總數不符", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) == MessageBoxResult.Yes))
+                {
+                    ExportAllExcel();
+                    ExportHTML();
+                }
+                else
+                {
+                    this.TxtBox1.Text += Environment.NewLine + "~~ 文件總數不符，請再次確認文件是否有刪減 ~~ ";
+                    this.TxtBox1.Text += Environment.NewLine + "~~ 管理員: " + a + " 件 ~~ ";
+                    this.TxtBox1.Text += Environment.NewLine + "~~ 總表: " + b + " 件 ~~ " + DateTime.Now.ToLongTimeString() + Environment.NewLine;
+                }
             }
         }
 
@@ -478,7 +526,7 @@ namespace Docs
             LoadFullDocs();
             if (ADocs.Count <= 0)
             {
-                this.TxtBox1.Text += Environment.NewLine + "~~ 無法讀取資料 ~~" + DateTime.Now.ToLongTimeString() + Environment.NewLine;
+                this.TxtBox1.Text += Environment.NewLine + "~~ 無法讀取總表 ~~" + DateTime.Now.ToLongTimeString() + Environment.NewLine;
                 return;
             }
 
@@ -506,65 +554,88 @@ namespace Docs
 
         private void Button4_Click(object sender, RoutedEventArgs e)
         {
-            LoadFullDocs();
+            CombineData();
             if (ADocs.Count <= 0)
             {
                 this.TxtBox1.Text += Environment.NewLine + "~~ 無法讀取資料 ~~" + DateTime.Now.ToLongTimeString() + Environment.NewLine;
                 return;
             }
-
-            try
+            int a = ADocs.Count;
+            LoadFullDocs();
+            if (ADocs.Count <= 0)
             {
-                string fpath = Environment.CurrentDirectory + @"\部門";
-                if (!System.IO.Directory.Exists(fpath))
+                this.TxtBox1.Text += Environment.NewLine + "~~ 無法讀取總表 ~~" + DateTime.Now.ToLongTimeString() + Environment.NewLine;
+                return;
+            }
+            int b = ADocs.Count;
+            if (a == b && a > 0)
+            {
+                try
                 {
-                    System.IO.Directory.CreateDirectory(fpath);
-                }
-                var odocs = ADocs.GroupBy(o => o.Own).ToDictionary(o => o.Key, o => o.ToList());
-                foreach (var x in odocs)
-                {
-                    fpath = Environment.CurrentDirectory + @"\部門\" + x.Key;
+                    string fpath = Environment.CurrentDirectory + @"\部門";
                     if (!System.IO.Directory.Exists(fpath))
                     {
                         System.IO.Directory.CreateDirectory(fpath);
                     }
-                    foreach (var finame in System.IO.Directory.GetFileSystemEntries(fpath))
+                    var odocs = ADocs.GroupBy(o => o.Own).ToDictionary(o => o.Key, o => o.ToList());
+                    foreach (var x in odocs)
                     {
-                        if (System.IO.Path.GetExtension(finame) != ".xlsx")
-                            continue;
-                        string nfpath = fpath + @"\備份";
-                        if (!System.IO.Directory.Exists(nfpath))
+                        fpath = Environment.CurrentDirectory + @"\部門\" + x.Key;
+                        if (!System.IO.Directory.Exists(fpath))
                         {
-                            System.IO.Directory.CreateDirectory(nfpath);
+                            System.IO.Directory.CreateDirectory(fpath);
                         }
-                        string fname = System.IO.Path.GetFileNameWithoutExtension(finame);
-                        File.Copy(fpath + @"\" + fname + ".xlsx", nfpath + @"\" + fname + ".xlsx", true);
-                        File.Delete(fpath + @"\" + fname + ".xlsx");
+                        foreach (var finame in System.IO.Directory.GetFileSystemEntries(fpath))
+                        {
+                            if (System.IO.Path.GetExtension(finame) != ".xlsx")
+                                continue;
+                            string nfpath = fpath + @"\備份";
+                            if (!System.IO.Directory.Exists(nfpath))
+                            {
+                                System.IO.Directory.CreateDirectory(nfpath);
+                            }
+                            string fname = System.IO.Path.GetFileNameWithoutExtension(finame);
+                            File.Copy(fpath + @"\" + fname + ".xlsx", nfpath + @"\" + fname + ".xlsx", true);
+                            File.Delete(fpath + @"\" + fname + ".xlsx");
+                        }
+                        var ddocs = x.Value.GroupBy(o => o.Depart).ToDictionary(o => o.Key, o => o.ToList());
+                        foreach (var y in ddocs)
+                        {
+                            SLDocument sl = MakeEXCEL(y.Value);
+                            sl.SaveAs(fpath + @"\" + y.Key + "(原-" + x.Key + ")" + ".xlsx");
+                        }
                     }
-                    var ddocs = x.Value.GroupBy(o => o.Depart).ToDictionary(o => o.Key, o => o.ToList());
-                    foreach (var y in ddocs)
-                    {
-                        SLDocument sl = MakeEXCEL(y.Value);
-                        sl.SaveAs(fpath + @"\" + y.Key + "(原-" + x.Key + ")" + ".xlsx");
-                    }
+                    this.TxtBox1.Text += Environment.NewLine + "~~ 匯出部門成功 ~~ " + DateTime.Now.ToLongTimeString() + Environment.NewLine;
                 }
-                this.TxtBox1.Text += Environment.NewLine + "~~ 匯出部門成功 ~~ " + DateTime.Now.ToLongTimeString() + Environment.NewLine;
+                catch (Exception ex)
+                {
+                    MessageBox.Show(ex.Message);
+                }
             }
-            catch (Exception ex)
+            else
             {
-                MessageBox.Show(ex.Message);
+                this.TxtBox1.Text += Environment.NewLine + "~~ 文件總數不符，請再次確認文件是否有刪減 ~~ ";
+                this.TxtBox1.Text += Environment.NewLine + "~~ 管理員: " + a + " 件 ~~ ";
+                this.TxtBox1.Text += Environment.NewLine + "~~ 總表: " + b + " 件 ~~ " + DateTime.Now.ToLongTimeString() + Environment.NewLine;
             }
         }
 
         private void Button5_Click(object sender, RoutedEventArgs e)
         {
-            LoadFullDocs();
+            CombineData();
             if (ADocs.Count <= 0)
             {
                 this.TxtBox1.Text += Environment.NewLine + "~~ 無法讀取資料 ~~" + DateTime.Now.ToLongTimeString() + Environment.NewLine;
                 return;
             }
-
+            int a = ADocs.Count;
+            LoadFullDocs();
+            if (ADocs.Count <= 0)
+            {
+                this.TxtBox1.Text += Environment.NewLine + "~~ 無法讀取總表 ~~" + DateTime.Now.ToLongTimeString() + Environment.NewLine;
+                return;
+            }
+            int b = ADocs.Count;
             try
             {
                 string fpath = Environment.CurrentDirectory + @"\部門";
@@ -590,7 +661,10 @@ namespace Docs
                     this.TxtBox1.Text += Environment.NewLine
                             + Path.GetFileName(fp) + string.Format(" 負責: {0, 5} 份", count.ToString());
                 }
-                if (cdocs.Count == ADocs.Count && cdocs.Count > 0)
+                this.TxtBox1.Text += Environment.NewLine
+                        + "      " + string.Format(" 總共: {0, 5} 份", cdocs.Count.ToString()) + Environment.NewLine;
+                int c = cdocs.Count;
+                if (c > 0 && a == b && b == c && c == a)
                 {
                     ADocs.Clear();
                     ADocs = cdocs;
@@ -618,7 +692,12 @@ namespace Docs
                         this.TxtBox1.Text += Environment.NewLine;
                 }
                 else
-                    this.TxtBox1.Text += Environment.NewLine + "~~ 文件總數不符，請重新分派 ~~ " + DateTime.Now.ToLongTimeString() + Environment.NewLine;
+                {
+                    this.TxtBox1.Text += Environment.NewLine + "~~ 文件總數不符，請重新分派 ~~ ";
+                    this.TxtBox1.Text += Environment.NewLine + "~~ 管理員: " + a + " 件 ~~ ";
+                    this.TxtBox1.Text += Environment.NewLine + "~~ 總表: " + b + " 件 ~~ ";
+                    this.TxtBox1.Text += Environment.NewLine + "~~ 合併後: " + c + " 件 ~~ " + DateTime.Now.ToLongTimeString() + Environment.NewLine;
+                }
             }
             catch (Exception ex)
             {
@@ -631,7 +710,7 @@ namespace Docs
             LoadFullDocs();
             if (ADocs.Count <= 0)
             {
-                this.TxtBox1.Text += Environment.NewLine + "~~ 無法讀取資料 ~~" + DateTime.Now.ToLongTimeString() + Environment.NewLine;
+                this.TxtBox1.Text += Environment.NewLine + "~~ 無法讀取總表 ~~" + DateTime.Now.ToLongTimeString() + Environment.NewLine;
                 return;
             }
             var odocs = ADocs.GroupBy(o => o.Own).ToDictionary(o => o.Key, o => o.ToList());
