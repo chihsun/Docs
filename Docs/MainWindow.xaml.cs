@@ -205,6 +205,11 @@ namespace Docs
                         {
                             System.IO.Directory.CreateDirectory(nfpath);
                         }
+                        nfpath = Environment.CurrentDirectory + @"\管理員\備份\" + DateTime.Now.ToString("yyy-MM-dd-HH-mm-ss");
+                        if (!System.IO.Directory.Exists(nfpath))
+                        {
+                            System.IO.Directory.CreateDirectory(nfpath);
+                        }
                         string fname = System.IO.Path.GetFileNameWithoutExtension(finame);
                         File.Copy(fpath + @"\" + fname + ".xlsx", nfpath + @"\" + fname + "(" + DateTime.Now.ToString("yyy-MM-dd-HH-mm-ss") + ")" + ".xlsx", true);
                         File.Delete(fpath + @"\" + fname + ".xlsx");
@@ -300,9 +305,10 @@ namespace Docs
                 sl.SetCellValue(i + 1, 5, Convert.ToDouble(y.Version));
                 sl.SetCellValue(i + 1, 6, y.Depart);
                 sl.SetCellValue(i + 1, 7, y.doctp);
-                sl.SetCellValue(i + 1, 8, y.Stime.ToString("yyy-MM-dd"));
-                sl.SetCellValue(i + 1, 9, y.Rtime.ToString("yyy-MM-dd"));
-                sl.SetCellValue(i + 1, 10, y.Ntime.ToString("yyy-MM-dd"));
+                sl.SetCellValue(i + 1, 8, y.Stime);
+                sl.SetCellValue(i + 1, 9, y.Rtime);
+                //sl.SetCellValue(i + 1, 10, y.Ntime.ToString("yyy-MM-dd"));
+                sl.SetCellValue(i + 1, 10, string.Format("=IF(I{0}=\"\",\"\",DATE(YEAR(I{0})+1,MONTH(I{0}),DAY(I{0})))", i + 1));
                 if (y.Ntime.AddMonths(-1) < DateTime.Now)
                     sl.SetCellStyle(i + 1, 10, style);
                 sl.SetCellValue(i + 1, 11, y.Own);
@@ -311,6 +317,10 @@ namespace Docs
                 SLStyle st2 = sl.CreateStyle();
                 st2.FormatCode = "#,##0.0";
                 sl.SetCellStyle(i + 1, 5, st2);
+                st2.FormatCode = "yyyy/mm/dd";
+                sl.SetCellStyle(i + 1, 8, st2);
+                sl.SetCellStyle(i + 1, 9, st2);
+                sl.SetCellStyle(i + 1, 10, st2);
                 SLStyle stp = sl.CreateStyle();
                 stp.Protection.Locked = false;
                 stp.Fill.SetPattern(PatternValues.Solid, System.Drawing.Color.FromArgb(255, 204, 255, 255), System.Drawing.Color.DarkSalmon);
