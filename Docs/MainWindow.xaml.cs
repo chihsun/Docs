@@ -249,6 +249,9 @@ namespace Docs
             cf.HighlightCellsWithDuplicates(SLHighlightCellsStyleValues.LightRedFill);
             cf.HighlightCellsEqual(true, "0", SLHighlightCellsStyleValues.LightRedFill);
             sl.AddConditionalFormatting(cf);
+            cf = new SLConditionalFormatting("J2", "J" + (dts.Count + 1).ToString());
+            cf.HighlightCellsWithFormula("=DATE(YEAR($J2),MONTH($J2)-1,DAY($J2)) <= TODAY()", SLHighlightCellsStyleValues.LightRedFill);
+            sl.AddConditionalFormatting(cf);
 
             SLStyle style = sl.CreateStyle();
             style.Alignment.WrapText = true;
@@ -310,7 +313,11 @@ namespace Docs
                 //sl.SetCellValue(i + 1, 10, y.Ntime.ToString("yyy-MM-dd"));
                 sl.SetCellValue(i + 1, 10, string.Format("=IF(I{0}=\"\",\"\",DATE(YEAR(I{0})+1,MONTH(I{0}),DAY(I{0})))", i + 1));
                 if (y.Ntime.AddMonths(-1) < DateTime.Now)
+                {
+                    sl.SetCellStyle(i + 1, 5, style);
+                    sl.SetCellStyle(i + 1, 9, style);
                     sl.SetCellStyle(i + 1, 10, style);
+                }
                 sl.SetCellValue(i + 1, 11, y.Own);
                 //sl.SetCellValue(i + 1, 13, y.Color);
                 
@@ -399,7 +406,7 @@ namespace Docs
                         "        <td>{6}</td>" + Environment.NewLine +
                         "        <td>{7}</td>" + Environment.NewLine +
                         "   </tr>" + Environment.NewLine
-                        , Int64.TryParse(x.webID, out long id) && id > 0 ? "<a href =\"http://km.sltung.com.tw/km/readdocument.aspx?documentId=" + x.webID + "\">" + x.ID + "</a>" : x.ID
+                        , Int64.TryParse(x.webID, out long id) && id > 0 ? "<a href =\"http://km.sltung.com.tw/km/readdocument.aspx?documentId=" + x.webID + "\" target=\"_blank\">" + x.ID + "</a>" : x.ID
                         , x.Name, string.Format("{0:0.0}", Convert.ToDouble(x.Version)), x.Depart, x.doctp, x.Stime.ToString("yyy-MM-dd"), x.Rtime.ToString("yyy-MM-dd"), x.Ntime.ToString("yyyy-MM-dd")
                         , x.Ntime < DateTime.Now ? " bgcolor=\"#FFCCFF\"" : x.Ntime.AddMonths(-1) < DateTime.Now ? " bgcolor=\"#CCFFFF\"": "");
                     sw += content;
@@ -515,12 +522,24 @@ namespace Docs
                 return;
             }
             int a = ADocs.Count;
+            int c = 0;
+            ADocs.ForEach(o =>
+            {
+                if (o.Rtime > DateTime.Now)
+                    this.TxtBox1.Text += Environment.NewLine + $"~~ 檢視日期錯誤 ~~({o.ID} : {o.Rtime})" + DateTime.Now.ToLongTimeString() + Environment.NewLine;
+            });
+            if (c > 0)
+            {
+                this.TxtBox1.Text += Environment.NewLine + "~~ 日期錯誤無法合併 ~~" + DateTime.Now.ToLongTimeString() + Environment.NewLine;
+                return;
+            }
             if (MessageBox.Show("是否確定合併?", "合併各負責人文件資料", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.Yes) == MessageBoxResult.Yes)
             {
                 if ((a == b && a > 0) || (a != b && MessageBox.Show(string.Format("文件總數不符(請確定是否有刪減)，是否確定合併?\n管理員: {0} 件\n總表: {1} 件", a, b), "文件總數不符", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) == MessageBoxResult.Yes))
                 {
                     ExportAllExcel();
                     ExportHTML();
+                    ExportOwn();
                 }
                 else
                 {
