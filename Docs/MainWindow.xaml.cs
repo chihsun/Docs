@@ -8,6 +8,8 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows;
+using System.Windows.Navigation;
+using System.Windows.Threading;
 using DocumentFormat.OpenXml.Spreadsheet;
 using SpreadsheetLight;
 
@@ -57,11 +59,84 @@ namespace Docs
             CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.InvariantCulture;
             System.Threading.Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
             System.Threading.Thread.CurrentThread.CurrentUICulture = CultureInfo.InvariantCulture;
+            _timer.Tick += Timer_Tick;
+            _timer.Start();
         }
         #region Parameter
         public List<DocType> ADocs = new List<DocType>();
+        public DispatcherTimer _timer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromSeconds(10)
+        };
         #endregion
         #region Method
+        public void Timer_Tick(object sender, EventArgs e)
+        {
+            try
+            {
+                /*
+                if (Cb_tick.IsChecked == false)
+                {
+                    _timer.Interval = new TimeSpan(1, 0, 0);
+                    return;
+                }
+                */
+                if ((22 - DateTime.Now.Hour) > 0)
+                {
+                    _timer.Interval = new TimeSpan(22 - DateTime.Now.Hour, 0, 0);
+                    this.TxtBox1.Text += Environment.NewLine + $"~~ 排程時間尚有 {22 - DateTime.Now.Hour} 小時 ~~" + DateTime.Now.ToLongTimeString() + Environment.NewLine;
+                    return;
+                }
+                LoadFullDocs();
+                if (ADocs.Count <= 0)
+                {
+                    this.TxtBox1.Text += Environment.NewLine + "~~ 無法讀取總表 ~~" + DateTime.Now.ToLongTimeString() + Environment.NewLine;
+                    _timer.Interval = new TimeSpan(12, 0, 0);
+                    return;
+                }
+                int b = ADocs.Count;
+                CombineData();
+                if (ADocs.Count <= 0)
+                {
+                    this.TxtBox1.Text += Environment.NewLine + "~~ 無法讀取資料 ~~" + DateTime.Now.ToLongTimeString() + Environment.NewLine;
+                    _timer.Interval = new TimeSpan(12, 0, 0);
+                    return;
+                }
+                int a = ADocs.Count;
+                int c = 0;
+                ADocs.ForEach(o =>
+                {
+                    if (o.Rtime > DateTime.Now)
+                        this.TxtBox1.Text += Environment.NewLine + $"~~ 檢視日期錯誤 ~~({o.ID} : {o.Rtime})" + DateTime.Now.ToLongTimeString() + Environment.NewLine;
+                });
+                if (c > 0)
+                {
+                    this.TxtBox1.Text += Environment.NewLine + "~~ 日期錯誤無法合併 ~~" + DateTime.Now.ToLongTimeString() + Environment.NewLine;
+                    _timer.Interval = new TimeSpan(12, 0, 0);
+                    return;
+                }
+                if (a == b)
+                {
+                    if (ExportAllExcel())
+                        ExportOwn();
+                    if (ExportHTML())
+                        ExportToWeb();
+                }
+                else
+                {
+                    this.TxtBox1.Text += Environment.NewLine + "~~ 文件總數不符，請確認確認文件是否有刪減 ~~ ";
+                    this.TxtBox1.Text += Environment.NewLine + "~~ 管理員: " + a + " 件 ~~ ";
+                    this.TxtBox1.Text += Environment.NewLine + "~~ 總表: " + b + " 件 ~~ " + DateTime.Now.ToLongTimeString() + Environment.NewLine;
+                }
+                _timer.Interval = new TimeSpan(12, 0, 0);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.ToString());
+                _timer.Interval = new TimeSpan(12, 0, 0);
+            }
+
+        }
         public List<DocType> ImportEXCEL(string fname)
         {
             if (!System.IO.File.Exists(fname))
@@ -800,6 +875,16 @@ namespace Docs
         {
             TxtBox1.CaretIndex = TxtBox1.Text.Length;
             TxtBox1.ScrollToEnd();
+        }
+
+        private void Cb_tick_Checked(object sender, RoutedEventArgs e)
+        {
+            _timer.Start();
+        }
+
+        private void Cb_tick_Unchecked(object sender, RoutedEventArgs e)
+        {
+            _timer.Stop();
         }
     }
 }
