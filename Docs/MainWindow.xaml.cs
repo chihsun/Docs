@@ -386,7 +386,7 @@ namespace Docs
                 MessageBox.Show(e.Message);
             }
         }
-        public void ExportHTML()
+        public bool ExportHTML()
         {
             string htmlname = Environment.CurrentDirectory + @"\template.htm";
             if (File.Exists(htmlname))
@@ -408,7 +408,7 @@ namespace Docs
                         "   </tr>" + Environment.NewLine
                         , Int64.TryParse(x.webID, out long id) && id > 0 ? "<a href =\"http://km.sltung.com.tw/km/readdocument.aspx?documentId=" + x.webID + "\" target=\"_blank\">" + x.ID + "</a>" : x.ID
                         , x.Name, string.Format("{0:0.0}", Convert.ToDouble(x.Version)), x.Depart, x.doctp, x.Stime.ToString("yyy-MM-dd"), x.Rtime.ToString("yyy-MM-dd"), x.Ntime.ToString("yyyy-MM-dd")
-                        , x.Ntime < DateTime.Now ? " bgcolor=\"#FFCCFF\"" : x.Ntime.AddMonths(-1) < DateTime.Now ? " bgcolor=\"#CCFFFF\"": "");
+                        , x.Ntime < DateTime.Now ? " bgcolor=\"#FFCCFF\"" : x.Ntime.AddMonths(-1) < DateTime.Now ? " bgcolor=\"#CCFFFF\"" : "");
                     sw += content;
                 }
                 string foot = string.Format("" +
@@ -428,7 +428,7 @@ namespace Docs
                 }
                 if (File.Exists(fpath + @"\new_page_66-1.htm"))
                 {
-                    string nfpath = Environment.CurrentDirectory + @"\合併檔\備份";
+                    string nfpath = Environment.CurrentDirectory + @"\合併檔\備份" + DateTime.Now.ToString("yyy-MM-dd"); ;
                     if (!System.IO.Directory.Exists(nfpath))
                     {
                         System.IO.Directory.CreateDirectory(nfpath);
@@ -437,16 +437,45 @@ namespace Docs
                 }
                 File.WriteAllText(fpath + @"\new_page_66-1.htm", sw, Encoding.Default);
                 this.TxtBox1.Text += Environment.NewLine + "~~ 網頁匯出成功 ~~ " + DateTime.Now.ToLongTimeString() + Environment.NewLine;
+                return true;
             }
             else
+            {
                 this.TxtBox1.Text += Environment.NewLine + "~~ 找不到網頁範本(template.htm) ~~ " + DateTime.Now.ToLongTimeString() + Environment.NewLine;
+                return false;
+            }
         }
-        public void ExportAllExcel()
+        public void ExportToWeb()
+        {
+            string fpath = Environment.CurrentDirectory + @"\合併檔";
+            if (!System.IO.Directory.Exists(fpath) || !File.Exists(fpath + @"\new_page_66-1.htm"))
+            {
+                this.TxtBox1.Text += Environment.NewLine + "~~ 找不到網頁檔案 ~~ " + DateTime.Now.ToLongTimeString() + Environment.NewLine;
+                return;
+            }
+            string dpath = @"P:\d4215.web";
+            if (!System.IO.Directory.Exists(dpath) || !File.Exists(dpath + @"\new_page_66-1.htm"))
+            {
+                this.TxtBox1.Text += Environment.NewLine + "~~ 找不到網頁位置 ~~ " + DateTime.Now.ToLongTimeString() + Environment.NewLine;
+                return;
+            }
+            /*
+            string ndpath = dpath + @"\backup\備份";
+            if (!System.IO.Directory.Exists(ndpath))
+            {
+                System.IO.Directory.CreateDirectory(ndpath);
+            }
+            File.Copy(dpath + @"\new_page_66-1.htm", ndpath + @"\new_page_66-1" + "(" + DateTime.Now.ToString("yyy-MM-dd-HH-mm-ss") + ")" + ".htm", true);
+            */
+            File.Copy(fpath + @"\new_page_66-1.htm", dpath + @"\new_page_66-1.htm", true);
+            this.TxtBox1.Text += Environment.NewLine + "~~ 網頁匯至網站成功 ~~ " + DateTime.Now.ToLongTimeString() + Environment.NewLine;
+        }
+        public bool ExportAllExcel()
         {
             if (ADocs.Count <= 0)
             {
                 this.TxtBox1.Text += Environment.NewLine + "~~ 合併失敗 ~~" + DateTime.Now.ToLongTimeString() + Environment.NewLine;
-                return;
+                return false;
             }
             try
             {
@@ -457,7 +486,7 @@ namespace Docs
                 }
                 if (File.Exists(fpath + @"\" + "合併總表" + ".xlsx"))
                 {
-                    string nfpath = Environment.CurrentDirectory + @"\合併檔\備份";
+                    string nfpath = Environment.CurrentDirectory + @"\合併檔\備份" + DateTime.Now.ToString("yyy-MM-dd"); ;
                     if (!System.IO.Directory.Exists(nfpath))
                     {
                         System.IO.Directory.CreateDirectory(nfpath);
@@ -467,10 +496,12 @@ namespace Docs
                 SLDocument sl = MakeEXCEL(ADocs);
                 sl.SaveAs(fpath + @"\" + "合併總表" + ".xlsx");
                 this.TxtBox1.Text += Environment.NewLine + "~~ 合併成功 ~~ " + DateTime.Now.ToLongTimeString() + Environment.NewLine;
+                return true;
             }
             catch (Exception ex)
             {
                 MessageBox.Show(ex.Message);
+                return false;
             }
         }
         #endregion
@@ -537,9 +568,14 @@ namespace Docs
             {
                 if ((a == b && a > 0) || (a != b && MessageBox.Show(string.Format("文件總數不符(請確定是否有刪減)，是否確定合併?\n管理員: {0} 件\n總表: {1} 件", a, b), "文件總數不符", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) == MessageBoxResult.Yes))
                 {
-                    ExportAllExcel();
-                    ExportHTML();
-                    ExportOwn();
+                    if (ExportAllExcel())
+                    {
+                        ExportOwn();
+                    }
+                    if (ExportHTML())
+                    {
+                        ExportToWeb();
+                    }
                 }
                 else
                 {
@@ -714,8 +750,8 @@ namespace Docs
                         ADocs[i].Index = (i + 1).ToString();
                     if (MessageBox.Show("是否確定合併?", "合併重分配文件資料", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.Yes) == MessageBoxResult.Yes)
                     {
-                        ExportAllExcel();
-                        this.TxtBox1.Text += Environment.NewLine + "~~ 文件重新分派成功 ~~ " + DateTime.Now.ToLongTimeString() + Environment.NewLine;
+                        if (ExportAllExcel())
+                            this.TxtBox1.Text += Environment.NewLine + "~~ 文件重新分派成功 ~~ " + DateTime.Now.ToLongTimeString() + Environment.NewLine;
                     }
                     else
                         this.TxtBox1.Text += Environment.NewLine;
