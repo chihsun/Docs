@@ -70,6 +70,23 @@ namespace Docs
         };
         #endregion
         #region Method
+        public void CleanBackup()
+        {
+            List<string> lists = new List<string>() { @"\合併檔", @"\管理員\備份" };
+            lists.ForEach(o =>
+            {
+                string fpath = Environment.CurrentDirectory + o;
+                if (System.IO.Directory.Exists(fpath))
+                {
+                    foreach (var x in System.IO.Directory.GetDirectories(fpath))
+                    {
+                        if (System.IO.Directory.GetCreationTime(x).AddMonths(6) < DateTime.Now)
+                            System.IO.Directory.Delete(x, true);
+                    }
+                }
+            });
+            this.TxtBox1.Text += Environment.NewLine + "~~ 執行清除六個月前備份 ~~" + DateTime.Now.ToLongTimeString() + Environment.NewLine;
+        }
         public void Timer_Tick(object sender, EventArgs e)
         {
             try
@@ -83,15 +100,15 @@ namespace Docs
                 */
                 if ((22 - DateTime.Now.Hour) > 0)
                 {
-                    _timer.Interval = new TimeSpan(22 - DateTime.Now.Hour, 0, 0);
+                    _timer.Interval = DateTime.Now.AddHours(22 - DateTime.Now.Hour) - DateTime.Now + new TimeSpan(0, 0, 10);
                     this.TxtBox1.Text += Environment.NewLine + $"~~ 排程時間尚有 {22 - DateTime.Now.Hour} 小時 ~~" + DateTime.Now.ToLongTimeString() + Environment.NewLine;
                     return;
                 }
+                _timer.Interval = new TimeSpan(12, 0, 0);
                 LoadFullDocs();
                 if (ADocs.Count <= 0)
                 {
                     this.TxtBox1.Text += Environment.NewLine + "~~ 無法讀取總表 ~~" + DateTime.Now.ToLongTimeString() + Environment.NewLine;
-                    _timer.Interval = new TimeSpan(12, 0, 0);
                     return;
                 }
                 int b = ADocs.Count;
@@ -99,7 +116,6 @@ namespace Docs
                 if (ADocs.Count <= 0)
                 {
                     this.TxtBox1.Text += Environment.NewLine + "~~ 無法讀取資料 ~~" + DateTime.Now.ToLongTimeString() + Environment.NewLine;
-                    _timer.Interval = new TimeSpan(12, 0, 0);
                     return;
                 }
                 int a = ADocs.Count;
@@ -112,7 +128,6 @@ namespace Docs
                 if (c > 0)
                 {
                     this.TxtBox1.Text += Environment.NewLine + "~~ 日期錯誤無法合併 ~~" + DateTime.Now.ToLongTimeString() + Environment.NewLine;
-                    _timer.Interval = new TimeSpan(12, 0, 0);
                     return;
                 }
                 if (a == b)
@@ -120,7 +135,10 @@ namespace Docs
                     if (ExportAllExcel())
                         ExportOwn();
                     if (ExportHTML())
-                        ExportToWeb();
+                        if (!ExportToWeb())
+                            _timer.Interval = new TimeSpan(1, 0, 0);
+                    if (DateTime.Now.Day == 1)
+                        CleanBackup();
                 }
                 else
                 {
@@ -128,12 +146,10 @@ namespace Docs
                     this.TxtBox1.Text += Environment.NewLine + "~~ 管理員: " + a + " 件 ~~ ";
                     this.TxtBox1.Text += Environment.NewLine + "~~ 總表: " + b + " 件 ~~ " + DateTime.Now.ToLongTimeString() + Environment.NewLine;
                 }
-                _timer.Interval = new TimeSpan(12, 0, 0);
             }
             catch (Exception ex)
             {
                 MessageBox.Show(ex.ToString());
-                _timer.Interval = new TimeSpan(12, 0, 0);
             }
 
         }
@@ -520,19 +536,19 @@ namespace Docs
                 return false;
             }
         }
-        public void ExportToWeb()
+        public bool ExportToWeb()
         {
             string fpath = Environment.CurrentDirectory + @"\合併檔";
             if (!System.IO.Directory.Exists(fpath) || !File.Exists(fpath + @"\new_page_66-1.htm"))
             {
                 this.TxtBox1.Text += Environment.NewLine + "~~ 找不到網頁檔案 ~~ " + DateTime.Now.ToLongTimeString() + Environment.NewLine;
-                return;
+                return false;
             }
             string dpath = @"P:\d4215.web";
             if (!System.IO.Directory.Exists(dpath) || !File.Exists(dpath + @"\new_page_66-1.htm"))
             {
                 this.TxtBox1.Text += Environment.NewLine + "~~ 找不到網頁位置 ~~ " + DateTime.Now.ToLongTimeString() + Environment.NewLine;
-                return;
+                return false;
             }
             /*
             string ndpath = dpath + @"\backup\備份";
@@ -544,6 +560,7 @@ namespace Docs
             */
             File.Copy(fpath + @"\new_page_66-1.htm", dpath + @"\new_page_66-1.htm", true);
             this.TxtBox1.Text += Environment.NewLine + "~~ 網頁匯至網站成功 ~~ " + DateTime.Now.ToLongTimeString() + Environment.NewLine;
+            return true;
         }
         public bool ExportAllExcel()
         {
@@ -651,6 +668,8 @@ namespace Docs
                     {
                         ExportToWeb();
                     }
+                    if (DateTime.Now.Day == 1)
+                        CleanBackup();
                 }
                 else
                 {

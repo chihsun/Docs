@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:Docs"
         mc:Ignorable="d"
-        Title="文件分派管理系統" Height="459.091" Width="609.091" ResizeMode="NoResize" WindowStartupLocation="CenterScreen">
+        Title="文件分派管理系統" Height="459.091" Width="609.091" ResizeMode="CanMinimize" WindowStartupLocation="CenterScreen">
     <Grid>
         <Button x:Name="BT1" Content="3 分派檔案給負責人" HorizontalAlignment="Left" Margin="411,85,0,0" VerticalAlignment="Top" Width="141" Click="Button_Click" Height="29"/>
         <Button x:Name="BT2" Content="合併總表及製作網頁" HorizontalAlignment="Left" Margin="53,18,0,0" VerticalAlignment="Top" Width="156" Click="Button2_Click" FontSize="16" Height="94"/>
