@@ -21,7 +21,7 @@ namespace Docs
     #region Class
     public class DocType
     {
-        public string Index { get; set; }
+        //public string Index { get; set; }
         public string ID { get; set; }
         public string webID { get; set; }
         public string Name { get; set; }
@@ -166,11 +166,11 @@ namespace Docs
                 List<DocType> ndocs = new List<DocType>();
                 for (int i = 0; i < stats.EndRowIndex; i++)
                 {
-                    if (string.IsNullOrEmpty(sl.GetCellValueAsString(i + 2, 1)))
+                    if (string.IsNullOrEmpty(sl.GetCellValueAsString(i + 2, 2)))
                         break;
                     DocType docs = new DocType
                     {
-                        Index = sl.GetCellValueAsString(i + 2, 1),
+                        //Index = sl.GetCellValueAsString(i + 2, 1),
                         ID = sl.GetCellValueAsString(i + 2, 2).Trim(),
                         Color = sl.GetCellStyle(i + 2, 2).Font.FontColor.ToString(),
                         webID = sl.GetCellValueAsString(i + 2, 13).Trim(),
@@ -206,12 +206,12 @@ namespace Docs
                     }
                     else
                         docs.webID = "-1";
-                    if (Int64.TryParse(sl.GetCellValueAsString(i + 2, 1).Trim(), out long id))
+                    /*if (Int64.TryParse(sl.GetCellValueAsString(i + 2, 1).Trim(), out long id))
                     {
                         docs.Index = id.ToString();
                     }
                     else
-                        docs.Index = "-1";
+                        docs.Index = "-1";*/
                     if (Double.TryParse(sl.GetCellValueAsString(i + 2, 5).Trim(), out double id3))
                     {
                         docs.Version = id3.ToString();
@@ -390,7 +390,7 @@ namespace Docs
             style.Font.FontColor = System.Drawing.Color.Red;
             foreach (var y in dts)
             {
-                sl.SetCellValue(i + 1, 1, Convert.ToInt64(y.Index));
+                //sl.SetCellValue(i + 1, 1, Convert.ToInt64(y.Index));
                 sl.SetCellValue(i + 1, 2, y.ID);
                 if (y.Eng)
                     sl.SetCellStyle(i + 1, 2, style);
@@ -468,8 +468,8 @@ namespace Docs
                         */
                         return x.ID.CompareTo(y.ID); 
                     });
-                    for (int i = 0; i < ADocs.Count; i++)
-                        ADocs[i].Index = (i + 1).ToString();
+                    /*for (int i = 0; i < ADocs.Count; i++)
+                        ADocs[i].Index = (i + 1).ToString();*/
                 }
             }
             catch (Exception e)
@@ -840,8 +840,8 @@ namespace Docs
                         */
                         return x.ID.CompareTo(y.ID);
                     });
-                    for (int i = 0; i < ADocs.Count; i++)
-                        ADocs[i].Index = (i + 1).ToString();
+                    /*for (int i = 0; i < ADocs.Count; i++)
+                        ADocs[i].Index = (i + 1).ToString();*/
                     if (MessageBox.Show("是否確定合併?", "合併重分配文件資料", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.Yes) == MessageBoxResult.Yes)
                     {
                         if (ExportAllExcel())
