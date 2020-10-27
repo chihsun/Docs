@@ -1,14 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Collections.Specialized;
-using System.Data.Odbc;
 using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows;
-using System.Windows.Navigation;
 using System.Windows.Threading;
 using DocumentFormat.OpenXml.Spreadsheet;
 using SpreadsheetLight;
@@ -100,7 +97,7 @@ namespace Docs
                 */
                 if ((22 - DateTime.Now.Hour) > 0)
                 {
-                    _timer.Interval = DateTime.Now.AddHours(22 - DateTime.Now.Hour) - DateTime.Now + new TimeSpan(0, 0, 10);
+                    _timer.Interval = DateTime.Today.AddHours(22) - DateTime.Now + new TimeSpan(0, 0, 10);
                     this.TxtBox1.Text += Environment.NewLine + $"~~ 排程時間尚有 {22 - DateTime.Now.Hour} 小時 ~~" + DateTime.Now.ToLongTimeString() + Environment.NewLine;
                     return;
                 }
@@ -112,10 +109,15 @@ namespace Docs
                     return;
                 }
                 int b = ADocs.Count;
-                CombineData();
+                bool changes = CombineData();
                 if (ADocs.Count <= 0)
                 {
                     this.TxtBox1.Text += Environment.NewLine + "~~ 無法讀取資料 ~~" + DateTime.Now.ToLongTimeString() + Environment.NewLine;
+                    return;
+                }
+                if (!changes)
+                {
+                    this.TxtBox1.Text += Environment.NewLine + "~~ 檔案似無異動，暫停更新一次 ~~ " + DateTime.Now.ToLongTimeString() + Environment.NewLine;
                     return;
                 }
                 int a = ADocs.Count;
@@ -442,16 +444,25 @@ namespace Docs
             sl.ProtectWorksheet(sp);
             return sl;
         }
-        public void CombineData()
+        public bool CombineData()
         {
+            bool result = false;
             string folderName = System.Environment.CurrentDirectory + @"\管理員";
             ADocs.Clear();
             try
             {
+                DateTime dts = DateTime.MinValue;
                 foreach (var finame in System.IO.Directory.GetFileSystemEntries(folderName))
                 {
-                    if (System.IO.Path.GetExtension(finame) != ".xlsx")
+                    if (System.IO.Path.GetExtension(finame) != ".xlsx"|| System.IO.Path.GetFileNameWithoutExtension(finame).Contains("~$"))
                         continue;
+
+                    if (dts == DateTime.MinValue)
+                        dts = System.IO.File.GetLastWriteTime(finame);
+                    if (System.IO.File.GetLastWriteTime(finame) > dts.AddHours(1) || System.IO.File.GetLastWriteTime(finame).AddHours(1) < dts)
+                        result = true;
+
+                    dts = System.IO.File.GetLastWriteTime(finame);
                     ADocs.AddRange(ImportEXCEL(finame));
                 }
                 if (ADocs.Count > 0)
@@ -476,6 +487,7 @@ namespace Docs
             {
                 MessageBox.Show(e.Message);
             }
+            return result;
         }
         public bool ExportHTML()
         {
@@ -638,6 +650,7 @@ namespace Docs
                 return;
             }
             int b = ADocs.Count;
+            var olddocs = ADocs.Select(o => o.ID + o.Name).ToList();
             CombineData();
             if (ADocs.Count <= 0)
             {
@@ -645,6 +658,7 @@ namespace Docs
                 return;
             }
             int a = ADocs.Count;
+            var newdocs = ADocs.Select(o => o.ID + o.Name).ToList();
             int c = 0;
             ADocs.ForEach(o =>
             {
@@ -676,6 +690,15 @@ namespace Docs
                     this.TxtBox1.Text += Environment.NewLine + "~~ 文件總數不符，請再次確認文件是否有刪減 ~~ ";
                     this.TxtBox1.Text += Environment.NewLine + "~~ 管理員: " + a + " 件 ~~ ";
                     this.TxtBox1.Text += Environment.NewLine + "~~ 總表: " + b + " 件 ~~ " + DateTime.Now.ToLongTimeString() + Environment.NewLine;
+                }
+                if (a != b)
+                {
+                    var diffdocs = newdocs.Except(olddocs).ToList();
+                    if (diffdocs?.Count > 0)
+                        this.TxtBox1.Text += Environment.NewLine + $"~~ 新增的檔案 ~~({string.Join(",", diffdocs)})" + DateTime.Now.ToLongTimeString() + Environment.NewLine;
+                    diffdocs = olddocs.Except(newdocs).ToList();
+                    if (diffdocs?.Count > 0)
+                        this.TxtBox1.Text += Environment.NewLine + $"~~ 刪減的檔案 ~~({string.Join(",", diffdocs)})" + DateTime.Now.ToLongTimeString() + Environment.NewLine;
                 }
             }
         }
