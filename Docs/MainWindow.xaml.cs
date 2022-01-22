@@ -27,24 +27,19 @@ namespace Docs
         public string doctp { get; set; }
         public DateTime Stime { get; set; }
         public DateTime Rtime { get; set; }
-        public DateTime Ntime
-        {
-            get
-            {
-                return this.Rtime.AddYears(1);
-            }
-        }
-        public DateTime Etime
-        {
-            get
-            {
-                return this.Rtime.AddYears(3);
-            }
-        }
+        public DateTime Ntime { get; set; }
+        public DateTime Etime { get; set; }
         public string Own { get; set; }
         public bool Eng { get; set; }
         public string Color { get; set; }
-
+    }
+    public class DocNum
+    {
+        public string Title { get; set; }
+        public int Docnumber { get; set; }
+        public int ntime { get; set; }
+        public int etime { get; set; }
+        public string hTitle { get; set; }
     }
     #endregion
     public partial class MainWindow : Window
@@ -58,6 +53,9 @@ namespace Docs
             System.Threading.Thread.CurrentThread.CurrentUICulture = CultureInfo.InvariantCulture;
             _timer.Tick += Timer_Tick;
             _timer.Start();
+            List<string> dtype = new List<string>() {"跨部門文件", "部門內文件" };
+            CB_Doctype.ItemsSource = dtype;
+            CB_Doctype.SelectedIndex = 0;
         }
         #region Parameter
         public List<DocType> ADocs = new List<DocType>();
@@ -65,6 +63,7 @@ namespace Docs
         {
             Interval = TimeSpan.FromSeconds(10)
         };
+        public DocNum Dnum = new DocNum();
         #endregion
         #region Method
         public void CleanBackup()
@@ -155,7 +154,7 @@ namespace Docs
             }
 
         }
-        public List<DocType> ImportEXCEL(string fname)
+        public List<DocType> ImportEXCEL(string fname, int ntime, int etime)
         {
             if (!System.IO.File.Exists(fname))
                 return new List<DocType>(); ;
@@ -184,6 +183,8 @@ namespace Docs
                         Rtime = sl.GetCellValueAsDateTime(i + 2, 9),
                         Own = sl.GetCellValueAsString(i + 2, 11).Trim()
                     };
+                    docs.Ntime = docs.Rtime.AddYears(ntime);
+                    docs.Etime = docs.Rtime.AddYears(etime);
                     if (DateTime.TryParseExact(sl.GetCellValueAsString(i + 2, 8), "yyyy-MM-dd", null, System.Globalization.DateTimeStyles.None, out DateTime _date))
                     {
                         docs.Stime = _date;
@@ -270,11 +271,12 @@ namespace Docs
             {
                 System.IO.Directory.CreateDirectory(fpath);
             }
-            string fname = fpath + @"\合併檔\合併總表.xlsx";
+
+            string fname = fpath + @"\合併檔\合併總表-" + Dnum.Title + ".xlsx";
             if (!System.IO.File.Exists(fname))
                 return;
-            ADocs = ImportEXCEL(fname);
-            this.TxtBox1.Text += Environment.NewLine + "~~ 載入總表 ~~" + DateTime.Now.ToLongTimeString() + Environment.NewLine;
+            ADocs = ImportEXCEL(fname, Dnum.ntime, Dnum.etime);
+            this.TxtBox1.Text += Environment.NewLine + "~~ 載入總表(" + Dnum.Title + ") ~~" + DateTime.Now.ToLongTimeString() + Environment.NewLine;
         }
         public void ExportOwn()
         {
@@ -284,7 +286,7 @@ namespace Docs
                 odocs = odocs.OrderBy(o => o.Key).ToDictionary(o => o.Key, o => o.Value);
                 try
                 {
-                    string fpath = Environment.CurrentDirectory + @"\管理員";
+                    string fpath = Environment.CurrentDirectory + @"\管理員\" + Dnum.Title;
                     if (!System.IO.Directory.Exists(fpath))
                     {
                         System.IO.Directory.CreateDirectory(fpath);
@@ -293,12 +295,7 @@ namespace Docs
                     {
                         if (System.IO.Path.GetExtension(finame) != ".xlsx")
                             continue;
-                        string nfpath = Environment.CurrentDirectory + @"\管理員\備份";
-                        if (!System.IO.Directory.Exists(nfpath))
-                        {
-                            System.IO.Directory.CreateDirectory(nfpath);
-                        }
-                        nfpath = Environment.CurrentDirectory + @"\管理員\備份\" + DateTime.Now.ToString("yyy-MM-dd-HH-mm-ss");
+                        string nfpath = Environment.CurrentDirectory + @"\管理員\" + Dnum.Title + @"\備份" + DateTime.Now.ToString("yyy-MM-dd-HH-mm-ss");
                         if (!System.IO.Directory.Exists(nfpath))
                         {
                             System.IO.Directory.CreateDirectory(nfpath);
@@ -310,7 +307,7 @@ namespace Docs
                     foreach (var x in odocs)
                     {
                         SLDocument sl = MakeEXCEL(x.Value);
-                        sl.SaveAs(fpath + @"\" + x.Key + ".xlsx");
+                        sl.SaveAs(fpath + @"\" + Dnum.Title + "-" + x.Key + ".xlsx");
                         this.TxtBox1.Text += Environment.NewLine
                             + x.Key + string.Format(" 負責: {0, 5} 份", x.Value.Count.ToString());
                     }
@@ -323,6 +320,55 @@ namespace Docs
                     MessageBox.Show(ex.Message);
                 }
             }
+        }
+        public bool CombineData()
+        {
+            bool result = false;
+            string fpath = System.Environment.CurrentDirectory + @"\管理員\" + Dnum.Title;
+            if (!System.IO.Directory.Exists(fpath))
+            {
+                System.IO.Directory.CreateDirectory(fpath);
+            }
+            ADocs.Clear();
+            try
+            {
+                DateTime dts = DateTime.MinValue;
+                foreach (var finame in System.IO.Directory.GetFileSystemEntries(fpath))
+                {
+                    if (System.IO.Path.GetExtension(finame) != ".xlsx" || System.IO.Path.GetFileNameWithoutExtension(finame).Contains("~$"))
+                        continue;
+
+                    if (dts == DateTime.MinValue)
+                        dts = System.IO.File.GetLastWriteTime(finame);
+                    if (System.IO.File.GetLastWriteTime(finame) > dts.AddHours(1) || System.IO.File.GetLastWriteTime(finame).AddHours(1) < dts)
+                        result = true;
+
+                    dts = System.IO.File.GetLastWriteTime(finame);
+                    ADocs.AddRange(ImportEXCEL(finame, Dnum.ntime, Dnum.etime));
+                }
+                if (ADocs.Count > 0)
+                {
+                    ADocs.Sort((x, y) => {
+                        /*
+                        Match m = Regex.Match(x.ID, @"(\d+)-");
+                        Match n = Regex.Match(y.ID, @"(\d+)-");
+                        if (m.Success && n.Success)
+                        {
+                            return Convert.ToInt32(m.Groups[1].ToString()).CompareTo(Convert.ToInt32(n.Groups[1].ToString()));
+                        }
+                        else
+                        */
+                        return x.ID.CompareTo(y.ID);
+                    });
+                    /*for (int i = 0; i < ADocs.Count; i++)
+                        ADocs[i].Index = (i + 1).ToString();*/
+                }
+            }
+            catch (Exception e)
+            {
+                MessageBox.Show(e.Message);
+            }
+            return result;
         }
         public SLDocument MakeEXCEL(List<DocType> dts)
         {
@@ -404,7 +450,7 @@ namespace Docs
                 sl.SetCellValue(i + 1, 8, y.Stime);
                 sl.SetCellValue(i + 1, 9, y.Rtime);
                 //sl.SetCellValue(i + 1, 10, y.Ntime.ToString("yyy-MM-dd"));
-                sl.SetCellValue(i + 1, 10, string.Format("=IF(I{0}=\"\",\"\",DATE(YEAR(I{0})+1,MONTH(I{0}),DAY(I{0})))", i + 1));
+                sl.SetCellValue(i + 1, 10, string.Format("=IF(I{0}=\"\",\"\",DATE(YEAR(I{0})+{1},MONTH(I{0}),DAY(I{0})))", i + 1, y.Ntime.Year - y.Rtime.Year));
                 if (y.Ntime.AddMonths(-1) < DateTime.Now)
                 {
                     sl.SetCellStyle(i + 1, 5, style);
@@ -444,58 +490,15 @@ namespace Docs
             sl.ProtectWorksheet(sp);
             return sl;
         }
-        public bool CombineData()
-        {
-            bool result = false;
-            string folderName = System.Environment.CurrentDirectory + @"\管理員";
-            ADocs.Clear();
-            try
-            {
-                DateTime dts = DateTime.MinValue;
-                foreach (var finame in System.IO.Directory.GetFileSystemEntries(folderName))
-                {
-                    if (System.IO.Path.GetExtension(finame) != ".xlsx"|| System.IO.Path.GetFileNameWithoutExtension(finame).Contains("~$"))
-                        continue;
-
-                    if (dts == DateTime.MinValue)
-                        dts = System.IO.File.GetLastWriteTime(finame);
-                    if (System.IO.File.GetLastWriteTime(finame) > dts.AddHours(1) || System.IO.File.GetLastWriteTime(finame).AddHours(1) < dts)
-                        result = true;
-
-                    dts = System.IO.File.GetLastWriteTime(finame);
-                    ADocs.AddRange(ImportEXCEL(finame));
-                }
-                if (ADocs.Count > 0)
-                {
-                    ADocs.Sort((x, y) => {
-                        /*
-                        Match m = Regex.Match(x.ID, @"(\d+)-");
-                        Match n = Regex.Match(y.ID, @"(\d+)-");
-                        if (m.Success && n.Success)
-                        {
-                            return Convert.ToInt32(m.Groups[1].ToString()).CompareTo(Convert.ToInt32(n.Groups[1].ToString()));
-                        }
-                        else
-                        */
-                        return x.ID.CompareTo(y.ID); 
-                    });
-                    /*for (int i = 0; i < ADocs.Count; i++)
-                        ADocs[i].Index = (i + 1).ToString();*/
-                }
-            }
-            catch (Exception e)
-            {
-                MessageBox.Show(e.Message);
-            }
-            return result;
-        }
         public bool ExportHTML()
         {
-            string htmlname = Environment.CurrentDirectory + @"\template.htm";
-            if (File.Exists(htmlname))
+            string hname = @"\new_page_" + Dnum.hTitle;
+            string tname = Environment.CurrentDirectory + @"\template.htm";
+
+            if (File.Exists(tname))
             {
-                string sw = File.ReadAllText(htmlname, Encoding.Default);
-                sw = sw.Replace("!!!!!!", DateTime.Now.ToString("yyyy-MM-dd"));
+                string sw = File.ReadAllText(tname, Encoding.Default);
+                sw = sw.Replace("!!!!!!", DateTime.Now.ToString("yyyy-MM-dd")).Replace("######", Dnum.Title);
                 foreach (var x in ADocs)
                 {
                     string content = string.Format("" +
@@ -529,16 +532,16 @@ namespace Docs
                 {
                     System.IO.Directory.CreateDirectory(fpath);
                 }
-                if (File.Exists(fpath + @"\new_page_66-1.htm"))
+                if (File.Exists(fpath + hname + ".htm"))
                 {
                     string nfpath = Environment.CurrentDirectory + @"\合併檔\備份" + DateTime.Now.ToString("yyy-MM-dd"); ;
                     if (!System.IO.Directory.Exists(nfpath))
                     {
                         System.IO.Directory.CreateDirectory(nfpath);
                     }
-                    File.Copy(fpath + @"\new_page_66-1.htm", nfpath + @"\new_page_66-1" + "(" + DateTime.Now.ToString("yyy-MM-dd-HH-mm-ss") + ")" + ".htm", true);
+                    File.Copy(fpath + hname + ".htm", nfpath + hname + "(" + DateTime.Now.ToString("yyy-MM-dd-HH-mm-ss") + ")" + ".htm", true);
                 }
-                File.WriteAllText(fpath + @"\new_page_66-1.htm", sw, Encoding.Default);
+                File.WriteAllText(fpath + hname + ".htm", sw, Encoding.Default);
                 this.TxtBox1.Text += Environment.NewLine + "~~ 網頁匯出成功 ~~ " + DateTime.Now.ToLongTimeString() + Environment.NewLine;
                 return true;
             }
@@ -550,27 +553,21 @@ namespace Docs
         }
         public bool ExportToWeb()
         {
+            string hname = @"\new_page_" + Dnum.hTitle;
+
             string fpath = Environment.CurrentDirectory + @"\合併檔";
-            if (!System.IO.Directory.Exists(fpath) || !File.Exists(fpath + @"\new_page_66-1.htm"))
+            if (!System.IO.Directory.Exists(fpath) || !File.Exists(fpath + hname + ".htm"))
             {
                 this.TxtBox1.Text += Environment.NewLine + "~~ 找不到網頁檔案 ~~ " + DateTime.Now.ToLongTimeString() + Environment.NewLine;
                 return false;
             }
             string dpath = @"P:\d4215.web";
-            if (!System.IO.Directory.Exists(dpath) || !File.Exists(dpath + @"\new_page_66-1.htm"))
+            if (!System.IO.Directory.Exists(dpath) || !File.Exists(dpath + hname + ".htm"))
             {
                 this.TxtBox1.Text += Environment.NewLine + "~~ 找不到網頁位置 ~~ " + DateTime.Now.ToLongTimeString() + Environment.NewLine;
                 return false;
             }
-            /*
-            string ndpath = dpath + @"\backup\備份";
-            if (!System.IO.Directory.Exists(ndpath))
-            {
-                System.IO.Directory.CreateDirectory(ndpath);
-            }
-            File.Copy(dpath + @"\new_page_66-1.htm", ndpath + @"\new_page_66-1" + "(" + DateTime.Now.ToString("yyy-MM-dd-HH-mm-ss") + ")" + ".htm", true);
-            */
-            File.Copy(fpath + @"\new_page_66-1.htm", dpath + @"\new_page_66-1.htm", true);
+            File.Copy(fpath + hname + ".htm", dpath + hname + ".htm", true);
             this.TxtBox1.Text += Environment.NewLine + "~~ 網頁匯至網站成功 ~~ " + DateTime.Now.ToLongTimeString() + Environment.NewLine;
             return true;
         }
@@ -578,7 +575,7 @@ namespace Docs
         {
             if (ADocs.Count <= 0)
             {
-                this.TxtBox1.Text += Environment.NewLine + "~~ 合併失敗 ~~" + DateTime.Now.ToLongTimeString() + Environment.NewLine;
+                this.TxtBox1.Text += Environment.NewLine + "~~ 合併失敗(" + Dnum.Title + ") ~~" + DateTime.Now.ToLongTimeString() + Environment.NewLine;
                 return false;
             }
             try
@@ -588,18 +585,18 @@ namespace Docs
                 {
                     System.IO.Directory.CreateDirectory(fpath);
                 }
-                if (File.Exists(fpath + @"\" + "合併總表" + ".xlsx"))
+                if (File.Exists(fpath + @"\合併總表-" + Dnum.Title + ".xlsx"))
                 {
                     string nfpath = Environment.CurrentDirectory + @"\合併檔\備份" + DateTime.Now.ToString("yyy-MM-dd"); ;
                     if (!System.IO.Directory.Exists(nfpath))
                     {
                         System.IO.Directory.CreateDirectory(nfpath);
                     }
-                    File.Copy(fpath + @"\" + "合併總表" + ".xlsx", nfpath + @"\" + "合併總表" + "(" + DateTime.Now.ToString("yyy-MM-dd-HH-mm-ss") + ")" + ".xlsx", true);
+                    File.Copy(fpath + @"\合併總表-" + Dnum.Title + ".xlsx", nfpath + @"\合併總表-" + Dnum.Title + "(" + DateTime.Now.ToString("yyy-MM-dd-HH-mm-ss") + ")" + ".xlsx", true);
                 }
                 SLDocument sl = MakeEXCEL(ADocs);
-                sl.SaveAs(fpath + @"\" + "合併總表" + ".xlsx");
-                this.TxtBox1.Text += Environment.NewLine + "~~ 合併成功 ~~ " + DateTime.Now.ToLongTimeString() + Environment.NewLine;
+                sl.SaveAs(fpath + @"\合併總表-" + Dnum.Title + ".xlsx");
+                this.TxtBox1.Text += Environment.NewLine + "~~ 合併成功(" + Dnum.Title + ") ~~ " + DateTime.Now.ToLongTimeString() + Environment.NewLine;
                 return true;
             }
             catch (Exception ex)
@@ -643,7 +640,7 @@ namespace Docs
 
         private void Button2_Click(object sender, RoutedEventArgs e)
         {
-            LoadFullDocs();
+            //LoadFullDocs();
             if (ADocs.Count <= 0)
             {
                 this.TxtBox1.Text += Environment.NewLine + "~~ 無法讀取總表 ~~" + DateTime.Now.ToLongTimeString() + Environment.NewLine;
@@ -655,7 +652,17 @@ namespace Docs
             if (ADocs.Count <= 0)
             {
                 this.TxtBox1.Text += Environment.NewLine + "~~ 無法讀取資料 ~~" + DateTime.Now.ToLongTimeString() + Environment.NewLine;
-                return;
+                if (MessageBox.Show("無原始分派資料，是否先產生初始分派檔案?", "分派文件資料", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) == MessageBoxResult.Yes)
+                {
+                    LoadFullDocs();
+                    ExportOwn();
+                    CombineData();
+                }
+                if (ADocs.Count <= 0)
+                {
+                    this.TxtBox1.Text += Environment.NewLine + "~~ 無法讀取初始資料 ~~" + DateTime.Now.ToLongTimeString() + Environment.NewLine;
+                    return;
+                }
             }
             int a = ADocs.Count;
             var newdocs = ADocs.Select(o => o.ID + o.Name).ToList();
@@ -705,10 +712,10 @@ namespace Docs
 
         private void Button3_Click(object sender, RoutedEventArgs e)
         {
-            LoadFullDocs();
+            //LoadFullDocs(Docnumber);
             if (ADocs.Count <= 0)
             {
-                this.TxtBox1.Text += Environment.NewLine + "~~ 無法讀取總表 ~~" + DateTime.Now.ToLongTimeString() + Environment.NewLine;
+                this.TxtBox1.Text += Environment.NewLine + "~~ 無法讀取總表(" + Dnum.Title + ") ~~" + DateTime.Now.ToLongTimeString() + Environment.NewLine;
                 return;
             }
 
@@ -723,10 +730,10 @@ namespace Docs
                     {
                         System.IO.Directory.CreateDirectory(fpath);
                     }
-                    sl.SaveAs(fpath + @"\" + "即將過期" + "(" + DateTime.Now.ToString("yyy-MM-dd") + ")" + ".xlsx");
+                    sl.SaveAs(fpath + @"\" + Dnum.Title + "-即將過期(" + DateTime.Now.ToString("yyy-MM-dd") + ")" + ".xlsx");
                 }
                 this.TxtBox1.Text += Environment.NewLine + string.Format("即將過期份數: {0, 5}份 ", exdocs.Count.ToString()) + DateTime.Now.ToLongTimeString() + Environment.NewLine;
-                this.TxtBox1.Text += Environment.NewLine + "~~ 匯出成功 ~~ " + DateTime.Now.ToLongTimeString() + Environment.NewLine;
+                this.TxtBox1.Text += Environment.NewLine + "~~ 匯出成功(" + Dnum.Title + ") ~~ " + DateTime.Now.ToLongTimeString() + Environment.NewLine;
             }
             catch (Exception ex)
             {
@@ -754,7 +761,7 @@ namespace Docs
             {
                 try
                 {
-                    string fpath = Environment.CurrentDirectory + @"\部門";
+                    string fpath = Environment.CurrentDirectory + @"\部門\" + Dnum.Title;
                     if (!System.IO.Directory.Exists(fpath))
                     {
                         System.IO.Directory.CreateDirectory(fpath);
@@ -762,7 +769,7 @@ namespace Docs
                     var odocs = ADocs.GroupBy(o => o.Own).ToDictionary(o => o.Key, o => o.ToList());
                     foreach (var x in odocs)
                     {
-                        fpath = Environment.CurrentDirectory + @"\部門\" + x.Key;
+                        fpath = Environment.CurrentDirectory + @"\部門\" + Dnum.Title + @"\" + x.Key;
                         if (!System.IO.Directory.Exists(fpath))
                         {
                             System.IO.Directory.CreateDirectory(fpath);
@@ -784,7 +791,7 @@ namespace Docs
                         foreach (var y in ddocs)
                         {
                             SLDocument sl = MakeEXCEL(y.Value);
-                            sl.SaveAs(fpath + @"\" + y.Key + "(原-" + x.Key + ")" + ".xlsx");
+                            sl.SaveAs(fpath + @"\" + Dnum.Title + "-" + y.Key + "(原-" + x.Key + ")" + ".xlsx");
                         }
                     }
                     this.TxtBox1.Text += Environment.NewLine + "~~ 匯出部門成功 ~~ " + DateTime.Now.ToLongTimeString() + Environment.NewLine;
@@ -820,13 +827,14 @@ namespace Docs
             int b = ADocs.Count;
             try
             {
-                string fpath = Environment.CurrentDirectory + @"\部門";
+                string fpath = Environment.CurrentDirectory + @"\部門\" + Dnum.Title;
                 if (!System.IO.Directory.Exists(fpath))
                 {
                     this.TxtBox1.Text += Environment.NewLine + "~~ 無法讀取部門資料 ~~" + DateTime.Now.ToLongTimeString() + Environment.NewLine;
                     return;
                 }
                 List<DocType> cdocs = new List<DocType>();
+                
                 foreach (var fp in System.IO.Directory.GetDirectories(fpath))
                 {
                     var npath = fpath + @"\" + Path.GetFileName(fp);
@@ -835,7 +843,7 @@ namespace Docs
                     {
                         if (System.IO.Path.GetExtension(finame) != ".xlsx")
                             continue;
-                        var ndocs = ImportEXCEL(finame);
+                        var ndocs = ImportEXCEL(finame, Dnum.ntime, Dnum.etime);
                         ndocs.ForEach(o => o.Own = Path.GetFileName(fp));
                         cdocs.AddRange(ndocs);
                         count += ndocs.Count;
@@ -889,7 +897,7 @@ namespace Docs
 
         private void Button6_Click(object sender, RoutedEventArgs e)
         {
-            LoadFullDocs();
+            //LoadFullDocs(Docnumber);
             if (ADocs.Count <= 0)
             {
                 this.TxtBox1.Text += Environment.NewLine + "~~ 無法讀取總表 ~~" + DateTime.Now.ToLongTimeString() + Environment.NewLine;
@@ -927,6 +935,42 @@ namespace Docs
         private void Cb_tick_Unchecked(object sender, RoutedEventArgs e)
         {
             _timer.Stop();
+        }
+
+        private void ButtonEA_Click(object sender, RoutedEventArgs e)
+        {
+            if (ADocs.Count <= 0)
+            {
+                this.TxtBox1.Text += Environment.NewLine + "~~ 無法讀取總表 ~~" + DateTime.Now.ToLongTimeString() + Environment.NewLine;
+                return;
+            }
+            ExportAllExcel();
+            ExportHTML();
+        }
+
+        private void CB_Doctype_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+        {
+            if (CB_Doctype.SelectedIndex != 0)
+            {
+                this.W1.Background = System.Windows.Media.Brushes.Wheat;
+                this.TxtBox1.Background = System.Windows.Media.Brushes.AliceBlue;
+                Dnum.Title = "部門內";
+                Dnum.Docnumber = CB_Doctype.SelectedIndex;
+                Dnum.ntime = 2;
+                Dnum.etime = 2;
+                Dnum.hTitle = "66-2";
+            }
+            else
+            {
+                this.W1.Background = System.Windows.Media.Brushes.White;
+                this.TxtBox1.Background = System.Windows.Media.Brushes.White;
+                Dnum.Title = "跨部門";
+                Dnum.Docnumber = CB_Doctype.SelectedIndex;
+                Dnum.ntime = 1;
+                Dnum.etime = 3;
+                Dnum.hTitle = "66-1";
+            }
+            LoadFullDocs();
         }
     }
 }
