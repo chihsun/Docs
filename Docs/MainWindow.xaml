@@ -5,18 +5,22 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:Docs"
         mc:Ignorable="d"
-        Title="文件分派管理系統" Height="459.091" Width="609.091" ResizeMode="CanMinimize" WindowStartupLocation="CenterScreen">
-    <Grid>
-        <Button x:Name="BT1" Content="3 分派檔案給負責人" HorizontalAlignment="Left" Margin="411,115,0,0" VerticalAlignment="Top" Width="141" Click="Button_Click" Height="29"/>
-        <Button x:Name="BT2" Content="合併總表及製作網頁" HorizontalAlignment="Left" Margin="53,48,0,0" VerticalAlignment="Top" Width="156" Click="Button2_Click" FontSize="16" Height="94"/>
-        <TextBox x:Name="TxtBox1" HorizontalAlignment="Left" Height="213" Margin="36,192,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="531" VerticalScrollBarVisibility="Auto" TextChanged="TxtBox1_TextChanged"/>
-        <Button x:Name="BT3" Content="匯出即將過期文件" HorizontalAlignment="Left" Margin="232,81,0,0" VerticalAlignment="Top" Width="141" Click="Button3_Click" RenderTransformOrigin="2.149,0.997" Height="29"/>
-        <Button x:Name="BT4" Content="1 展開原負責的部門" HorizontalAlignment="Left" Margin="411,47,0,0" VerticalAlignment="Top" Width="141" Click="Button4_Click" RenderTransformOrigin="2.149,0.997" Height="29"/>
-        <Button x:Name="BT5" Content="2 合併重分配的部門" HorizontalAlignment="Left" Margin="411,81,0,0" VerticalAlignment="Top" Width="141" Click="Button5_Click" RenderTransformOrigin="2.149,0.997" FontFamily="Microsoft JhengHei" Height="29"/>
-        <Button x:Name="BT6" Content="計算現有負責件數" HorizontalAlignment="Left" Margin="232,48,0,0" VerticalAlignment="Top" Width="141" Click="Button6_Click" Height="29"/>
-        <CheckBox x:Name="Cb_tick" Content="自動合併&amp;製作網頁" HorizontalAlignment="Center" Margin="0,122,0,0" VerticalAlignment="Top" Checked="Cb_tick_Checked" Unchecked="Cb_tick_Unchecked" IsChecked="True"/>
-        <Button x:Name="BT_EA" Content="單純匯出總表及網頁" HorizontalAlignment="Left" Margin="53,153,0,0" VerticalAlignment="Top" Width="156" Click="ButtonEA_Click" RenderTransformOrigin="2.149,0.997" Height="29"/>
+        Title="文件分派管理系統" Height="501" Width="609.091" ResizeMode="CanMinimize" WindowStartupLocation="CenterScreen">
+    <Grid x:Name="GD_main">
+        <Rectangle HorizontalAlignment="Left" Height="170" Margin="396,12,0,0" Stroke="Black" VerticalAlignment="Top" Width="171" Fill="#FFD3C8FD"/>
+
+        <Button x:Name="BT1" Content="3 重新分派管理員" HorizontalAlignment="Left" Margin="411,138,0,0" VerticalAlignment="Top" Width="141" Click="BT_ExportOwn" Height="30" FontSize="14"/>
+        <Button x:Name="BT2" Content="合併總表&#xA;重新分派&#xA;製作網頁" HorizontalAlignment="Left" Margin="53,48,0,0" VerticalAlignment="Top" Width="156" Click="BT_ALL" FontSize="18" Height="134"/>
+        <TextBox x:Name="TxtBox1" HorizontalAlignment="Left" Height="264" Margin="21,187,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="553" VerticalScrollBarVisibility="Auto" TextChanged="TxtBox1_TextChanged" FontSize="14"/>
+        <Button x:Name="BT3" Content="匯出即將過期文件" HorizontalAlignment="Left" Margin="232,58,0,0" VerticalAlignment="Top" Width="141" Click="BT_ExportExpired" RenderTransformOrigin="2.149,0.997" Height="29" FontSize="14"/>
+        <Button x:Name="BT4" Content="1 匯出部門對映表" HorizontalAlignment="Left" Margin="411,58,0,0" VerticalAlignment="Top" Width="141" Click="BT_ExportDepart" RenderTransformOrigin="2.149,0.997" Height="29" FontSize="14"/>
+        <Button x:Name="BT5" Content="2 合併部門對映表" HorizontalAlignment="Left" Margin="411,97,0,0" VerticalAlignment="Top" Width="141" Click="BT_ImportDepart" RenderTransformOrigin="2.149,0.997" FontFamily="Microsoft JhengHei" Height="29" FontSize="14"/>
+        <Button x:Name="BT6" Content="計算現有負責件數" HorizontalAlignment="Left" Margin="232,21,0,0" VerticalAlignment="Top" Width="141" Click="BT_CalCount" Height="29" FontSize="14"/>
+        <CheckBox x:Name="Cb_tick" Content="自動合併&amp;製作網頁" HorizontalAlignment="Center" Margin="0,133,0,0" VerticalAlignment="Top" Checked="Cb_tick_Checked" Unchecked="Cb_tick_Unchecked" IsChecked="False" IsEnabled="False"/>
+        <Button x:Name="BT_EA" Content="單純匯出總表及網頁" HorizontalAlignment="Left" Margin="232,95,0,0" VerticalAlignment="Top" Width="141" Click="BT_ExportSimple" RenderTransformOrigin="2.149,0.997" Height="29" FontSize="14"/>
         <ComboBox x:Name="CB_Doctype" HorizontalAlignment="Left" Margin="53,12,0,0" VerticalAlignment="Top" Width="156" SelectionChanged="CB_Doctype_SelectionChanged" Height="29" FontSize="16" VerticalContentAlignment="Center" HorizontalContentAlignment="Center"/>
+        <Label Content="重新分配部門" HorizontalAlignment="Left" Margin="434,22,0,0" VerticalAlignment="Top" FontSize="14"/>
+        <Label x:Name="LB_build" Content="版本號" HorizontalAlignment="Left" Margin="232,153,0,0" VerticalAlignment="Top"/>
 
     </Grid>
 </Window>
