@@ -199,18 +199,19 @@ namespace Docs
                     while (!String.IsNullOrEmpty(sl.GetCellValueAsString(i + 2, h).Trim()))
                     {
                         string[] hisdocs = sl.GetCellValueAsString(i + 2, h).Trim().Split(';');
-                        if (hisdocs.Length != 3)
-                            continue;
-                        List<DocHistory> historys = new List<DocHistory>();
-                        if (Double.TryParse(hisdocs[1].Trim(), out double hid)
-                            && DateTime.TryParseExact(hisdocs[2].Trim(), "yyyy-MM-dd", null, System.Globalization.DateTimeStyles.None, out DateTime hrtime))
+                        if (hisdocs.Length == 3)
                         {
-                            historys.Add(new DocHistory()
+                            List<DocHistory> historys = new List<DocHistory>();
+                            if (Double.TryParse(hisdocs[1].Trim(), out double hid)
+                                && DateTime.TryParseExact(hisdocs[2].Trim(), "yyyy-MM-dd", null, System.Globalization.DateTimeStyles.None, out DateTime hrtime))
                             {
-                                Name = hisdocs[0].Trim(),
-                                Version = hid.ToString(),
-                                Rtime = hrtime
-                            });
+                                historys.Add(new DocHistory()
+                                {
+                                    Name = hisdocs[0].Trim(),
+                                    Version = hid.ToString(),
+                                    Rtime = hrtime
+                                });
+                            }
                         }
                         h++;
                     }
@@ -373,8 +374,13 @@ namespace Docs
                 return x.ID.CompareTo(y.ID);
             });
             var numericList = result.Where(i => int.TryParse(i.ID.Split('-')[0], out _)).OrderBy(j => int.Parse(j.ID.Split('-')[0])).ToList();
-            result.Clear();
-            result.AddRange(numericList);
+            var nonNumericList = result.Where(i => !int.TryParse(i.ID.Split('-')[0], out _)).OrderBy(j => j.ID).ToList();
+            if (result.Count > 0 && numericList.Count + nonNumericList.Count == result.Count)
+            {
+                result.Clear();
+                result.AddRange(numericList);
+                result.AddRange(nonNumericList);
+            }
             if (CheckRule(result))
             {
                 ShowMessage($"載入總表({Dnum.Title})，生效中總份數: {result.Count} 份，廢止總份數: {result.Where(o => o.Invalid).ToList().Count} 份");
@@ -442,6 +448,9 @@ namespace Docs
             cf.HighlightCellsWithDuplicates(SLHighlightCellsStyleValues.LightRedFill);
             cf.HighlightCellsEqual(true, "0", SLHighlightCellsStyleValues.LightRedFill);
             sl.AddConditionalFormatting(cf);
+            cf = new SLConditionalFormatting("L2", "L" + (dts.Count + 1).ToString());
+            cf.HighlightCellsEqual(true, "廢止", SLHighlightCellsStyleValues.LightRedFill);
+            sl.AddConditionalFormatting(cf);
             /*
             cf = new SLConditionalFormatting("A2", "A" + (dts.Count + 1).ToString());
             cf.HighlightCellsWithDuplicates(SLHighlightCellsStyleValues.LightRedFill);
@@ -470,6 +479,7 @@ namespace Docs
             sl.SetCellStyle(1, 12, style);
             sl.SetCellStyle(1, 13, style);
             sl.SetCellStyle(1, 14, style);
+            sl.SetCellStyle("L2", "L" + (dts.Count + 1).ToString(), style);
             sl.SetColumnWidth(1, 10);
             sl.SetColumnWidth(2, 15);
             sl.SetColumnWidth(3, 10);
@@ -788,6 +798,7 @@ namespace Docs
             List<DocType> docadd = new List<DocType>();
             List<DocType> docdelete = new List<DocType>();
             List<DocType> docinvalid = new List<DocType>();
+            List<DocType> docrepeated = new List<DocType>();
             List<DocType> Doc_Combine = new List<DocType>();
 
             var OldDocs = ADocs.Where(o => o.Invalid == false).ToDictionary(o => o.ID, o => o);
@@ -808,13 +819,19 @@ namespace Docs
                 ShowMessage($"可能誤刪的檔案({string.Join(",", docdelete.Select(o => o.ID + o.Name).ToList())})");
                 return new List<DocType>();
             }
+            OldDocs = ADocs.ToDictionary(o => o.ID, o => o);
 
             foreach (var ndoc in CDocs)
             {
                 if (OldDocs.ContainsKey(ndoc.ID))
                 {
                     var odoc = OldDocs[ndoc.ID];
-                    if (odoc.Invalid == false && ndoc.Invalid == true)
+                    if (odoc.Invalid == true)
+                    {
+                        docrepeated.Add(ndoc);
+                        continue;
+                    }
+                    else if (odoc.Invalid == false && ndoc.Invalid == true)
                     {
                         docinvalid.Add(ndoc);
                     }
@@ -853,11 +870,10 @@ namespace Docs
                 ShowMessage($"資料合併錯誤");
                 return new List<DocType>();
             }
-            /*
-             * 需把資料庫中已廢止的資料加回
-             */
-            Doc_Combine.AddRange(ADocs.Where(o => o.Invalid == true).ToList());
-
+            if (docrepeated.Count > 0)
+            {
+                ShowMessage($"已廢止的重複檔案({string.Join(",", docrepeated.Select(o => o.ID + o.Name).ToList())})");
+            }
             if (docchange.Count > 0 || docadd.Count > 0 || docinvalid.Count > 0)
             {
                 ShowMessage($"變更的檔案({string.Join(",", docchange.Select(o => o.ID + o.Name).ToList())})");
@@ -866,15 +882,23 @@ namespace Docs
             }
             else
             {
-                ShowMessage("檔案似乎未有任何變動");
+                ShowMessage("檔案似乎未有任何變動，不需合併，程式自動略過合併");
                 return new List<DocType>();
             }
+            /*
+             * 需把資料庫中已廢止的資料加回，是否會重複加入已廢止的文件？？
+             */
+            Doc_Combine.AddRange(ADocs.Where(o => o.Invalid == true).ToList());
+
             Doc_Combine.Sort((x, y) => {
                 return x.ID.CompareTo(y.ID);
             });
             var numericList = Doc_Combine.Where(i => int.TryParse(i.ID.Split('-')[0], out _)).OrderBy(j => int.Parse(j.ID.Split('-')[0])).ToList();
-            Doc_Combine.Clear();
-            Doc_Combine.AddRange(numericList);
+            if (numericList.Count > 0 && numericList.Count == Doc_Combine.Count)
+            {
+                Doc_Combine.Clear();
+                Doc_Combine.AddRange(numericList);
+            }
             return Doc_Combine;
         }
         public void ShowMessage(string message)
@@ -912,7 +936,7 @@ namespace Docs
             }
             if (doc_merge.Count <= 0)
             {
-                ShowMessage("檔案合併檢核錯誤");
+                ShowMessage("檔案合併檢核失敗");
                 return;
             }
 
@@ -1227,7 +1251,14 @@ namespace Docs
             }
             this.TxtBox1.Text = String.Empty;
             ADocs.Clear();
-            ADocs = LoadFullDocs();
+            try
+            {
+                ADocs = LoadFullDocs();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.ToString());
+            }
         }
     }
 }
